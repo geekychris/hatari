@@ -74,6 +74,15 @@ While `state` is `stopped` the CPU is frozen in the debugger. Only
 `/debug/*`, `/cpu/*`, `/mem`, `/screen`, `/status`, `/console` make sense
 until you continue. `/emu/resume` or `/emu/run` also leave the stop.
 
+## GDB (source-level / IDE debugging)
+
+Start Hatari with `--gdb-port 2159`, then `gdb -x tools/agent/hatari.gdb [prog.elf]`
+(Homebrew `gdb` supports m68k; `set endian big` is required without an m68k ELF).
+`monitor <hatari debugger cmd>` works inside GDB. Load program symbols with
+`add-symbol-file prog.elf -o 0x<TEXT>` (TEXT from `monitor info basepage`).
+Details: `doc/agent-gdb.md`. GDB and the HTTP API can be attached together;
+let one of them drive stepping at a time.
+
 ## Machines and ROMs
 
 ```sh
@@ -92,9 +101,19 @@ Save a snapshot at a known point (`POST /state/save path=/tmp/x.sav`), then
 per test case: `/state/load`, input, `/emu/run?frames=N`, compare `/screen`,
 `/mem` or `/console`. Restore only works with the same machine config.
 
+## Examples to copy from
+
+- `examples/interact/tests/lib.sh`: shell helpers (wait_for console regex, click by layout name, shots).
+- `tools/agent/hatari_agent.py`: Python client (`Hatari().click(x, y)` etc.).
+- Self-describing app pattern: the program prints `LAYOUT`/`SYMBOL`/event lines via NatFeats
+  (`examples/gemdemo/natfeats.c`), so tests don't guess coordinates from pixels.
+- C cross toolchain: `tools/agent/fetch-cross-mint.sh`, build with `m68k-atari-mintelf-gcc ... -lgem`.
+
 ## Gotchas
 
 - Never leave Hatari's own GUI (F12) open: requests wait until it closes.
+- Joystick: TOS boots with IKBD joystick reports off; programs send IKBD `0x14,0x08`.
+  With the mouse on, joystick-1 fire arrives as the right mouse button.
 - `/emu/run` with large `frames` takes real time. Combine with fast forward.
 - If the API doesn't answer, check `/tmp/hatari-agent.log`. Another Hatari
   might hold the port (`lsof -nP -iTCP:7777`).

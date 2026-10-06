@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /* option handling (called while parsing the command line) */
 extern const char *AgentApi_SetPort(const char *arg);
@@ -35,6 +36,11 @@ extern void AgentApi_Poll(void);
  */
 extern bool AgentApi_OwnsDebugger(void);
 extern void AgentApi_DebugStop(int reason);
+
+/* shared stop/resume control, also used by the GDB stub */
+extern void AgentApi_RequestResume(void);
+extern void AgentApi_RequestBreak(void);
+extern int AgentApi_DebugCommand(const char *cmd, char **out, size_t *len);
 
 /* Emulated program console output (--conout / NatFeats) capture */
 extern void AgentApi_ConsoleWrite(const char *buf, int len);

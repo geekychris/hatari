@@ -36,6 +36,7 @@ const char AgentApi_fileid[] = "Hatari agentapi.c";
 #include <fcntl.h>
 
 #include "agenthttp.h"
+#include "gdbstub.h"
 #include "change.h"
 #include "configuration.h"
 #include "conv_st.h"
@@ -181,7 +182,8 @@ bool AgentApi_IsEnabled(void)
 
 bool AgentApi_OwnsDebugger(void)
 {
-	return Running && OwnDebugger;
+	/* a connected GDB always gets the stops */
+	return (Running && OwnDebugger) || GdbStub_IsAttached();
 }
 
 
@@ -1700,6 +1702,26 @@ static int run_debug_cmd(const char *cmd, char **out, size_t *len)
 	return ret;
 }
 
+int AgentApi_DebugCommand(const char *cmd, char **out, size_t *len)
+{
+	return run_debug_cmd(cmd, out, len);
+}
+
+void AgentApi_RequestResume(void)
+{
+	if (InDebugStop)
+		ResumeRequested = true;
+}
+
+void AgentApi_RequestBreak(void)
+{
+	if (InDebugStop)
+		return;
+	BreakRequested = true;
+	DebugCpu_RequestBreak();
+	Main_UnPauseEmulation();
+}
+
 static void h_debug_cmd(agent_req_t *req)
 {
 	const char *cmd = param_text(req, "cmd");
@@ -2135,13 +2157,16 @@ void AgentApi_DebugStop(int reason)
 	StopCount++;
 	fprintf(stderr, "Agent API: CPU stopped (%s) at $%06x, waiting for remote commands\n",
 	        reason_name(reason), StopPC);
+	GdbStub_NotifyStop(reason);
 
 	while (!ResumeRequested && !bQuitProgram)
 	{
 		AgentApi_Poll();
+		GdbStub_Poll(true);
 		if (ResumeRequested)
 			break;
-		AgentHttp_WaitIncoming(Jobs ? 20 : 100);
+		/* GDB socket is polled, HTTP requests wake us up */
+		AgentHttp_WaitIncoming(GdbStub_IsEnabled() ? 5 : Jobs ? 20 : 100);
 	}
 	InDebugStop = false;
 }
@@ -2205,6 +2230,9 @@ bool AgentApi_IsEnabled(void) { return false; }
 void AgentApi_Poll(void) { }
 bool AgentApi_OwnsDebugger(void) { return false; }
 void AgentApi_DebugStop(int reason) { }
+void AgentApi_RequestResume(void) { }
+void AgentApi_RequestBreak(void) { }
+int AgentApi_DebugCommand(const char *cmd, char **out, size_t *len) { *out = NULL; *len = 0; return 0; }
 void AgentApi_ConsoleWrite(const char *buf, int len) { }
 uint8_t AgentApi_JoystickBits(int port) { return 0; }
 
