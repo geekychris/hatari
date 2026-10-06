@@ -15,6 +15,7 @@
 #endif
 
 #include "agentapi.h"
+#include "gdbstub.h"
 #include "configuration.h"
 #include "control.h"
 #include "conv_st.h"
@@ -151,6 +152,7 @@ void GuiEvent_EventHandler(void)
 		/* check remote process control */
 		remotepause = Control_CheckUpdates();
 		AgentApi_Poll();
+		GdbStub_Poll(false);
 
 		if ( bEmulationActive || remotepause )
 		{
@@ -163,7 +165,7 @@ void GuiEvent_EventHandler(void)
 			if ( bEmulationActive )
 				break;
 			/* with agent API, wake up regularly for its job timeouts */
-			if (AgentApi_IsEnabled())
+			if (AgentApi_IsEnabled() || GdbStub_IsEnabled())
 				events = SDL_WaitEventTimeout(&event, 100);
 			else
 				events = SDL_WaitEvent(&event);

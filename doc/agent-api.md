@@ -6,7 +6,8 @@ It covers emulation control, keyboard/mouse/joystick input, screenshots,
 TOS ROM selection, media, memory and register access, the debugger,
 snapshots and program console output.
 
-The design is described in [agent-design.md](agent-design.md).
+The design is described in [agent-design.md](agent-design.md). For
+debugging with GDB (`--gdb-port`) see [agent-gdb.md](agent-gdb.md).
 
 ## Starting
 

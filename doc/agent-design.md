@@ -141,6 +141,30 @@ non-fatal alerts are logged instead of shown and quit confirmation is
 off. Option changes made through the API never ask the "must reset,
 continue?" question (`apply_cmdline()`).
 
+### GDB remote stub
+
+`--gdb-port` adds a GDB remote serial protocol stub (`src/gdbstub.c`,
+documented in [agent-gdb.md](agent-gdb.md)). It doesn't have its own
+stop machinery. It plugs into the same pieces as the HTTP API:
+
+* **Stops**: a connected GDB makes `AgentApi_OwnsDebugger()` true, so
+  `DebugUI()` enters the shared stop loop, which calls
+  `GdbStub_NotifyStop()` (stop reply, including `watch:` for watchpoints)
+  and polls the GDB socket next to the HTTP queue.
+* **Resume / break**: `AgentApi_RequestResume()` and
+  `AgentApi_RequestBreak()`, the same calls the HTTP endpoints use.
+  Single step uses `DebugCpu_RequestBreak()`.
+* **Breakpoints**: GDB `Z0` and `Z2` become Hatari conditional breakpoints
+  (`pc=$addr`, `($addr).w ! ($addr).w` for value-change watchpoints), so
+  they show up in `/debug/breakpoints` and `monitor b` and cost nothing
+  when unused.
+* **`monitor`**: passes through to the Hatari debugger with captured
+  output, so GDB users get every Hatari debugger feature.
+
+The socket is non-blocking and serviced on the main thread, so it needs
+no threads. The stop reply is only sent when GDB waits for one. An
+unsolicited stop reply after attach confuses GDB's protocol state.
+
 ### Security
 
 The API listens on 127.0.0.1 by default and has **no authentication**.
@@ -155,7 +179,8 @@ Kept small, so the fork can keep merging upstream:
 | File | Change |
 |---|---|
 | `src/agentapi.c`, `src/agenthttp.c`, `src/includes/agent*.h` | New: API and HTTP server. |
-| `src/options.c` | `--agent-port`, `--agent-bind`, `--agent-rom-dir`, `--agent-debugger`. |
+| `src/gdbstub.c`, `src/includes/gdbstub.h` | New: GDB remote stub. |
+| `src/options.c` | `--agent-port`, `--agent-bind`, `--agent-rom-dir`, `--agent-debugger`, `--gdb-port`. |
 | `src/main.c` | Start and stop the API. |
 | `src/sdl/gui_event.c` | Poll the API. Wake-up event, wait timeout while paused. |
 | `src/debug/debugui.c` | Route debugger stops to the API. `DebugUI_RemoteCommand()` returns the command's resume code and doesn't repeat the previous command on empty input. |
@@ -177,14 +202,12 @@ unsupported.
   you own them, drop them into the same folder and `/roms` lists them.
 * `tools/agent/hatari-agent-run.sh`: start Hatari with the API and wait
   until it answers.
+* `tools/agent/hatari.gdb`: GDB init file (big endian, connect).
 * `.claude/skills/hatari-agent/SKILL.md`: instructions that let Claude Code
   drive the emulator through the API.
 
 ## Roadmap
 
-* **GDB remote protocol stub** (`--gdb-port`), so `m68k-elf-gdb` and IDEs
-  can debug with source and symbols. It will share the stop/resume
-  machinery above.
 * MCP server wrapper exposing the endpoints as MCP tools (screenshots as
   image content).
 * Joystick port 0 / IKBD joystick-mode helpers, STE joypads.

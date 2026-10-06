@@ -5,6 +5,8 @@ ST/STE/TT/Falcon emulator. It adds an **HTTP/JSON control API** so that AI
 agents and automated tools can drive the emulator end to end: boot any TOS,
 type and click, read the screen at native resolution, capture program text
 output, save and restore snapshots, and stop, step and inspect the 68k CPU.
+It also includes a **GDB remote stub**, so any m68k GDB or IDE can debug
+code running in the emulator.
 
 For the original Hatari documentation see [readme.txt](readme.txt) and
 [doc/](doc/).
@@ -42,8 +44,10 @@ curl -s -XPOST localhost:7777/debug/break
 | Memory and CPU | read/write memory, registers, disassembly |
 | Debugger | break, step, step over, breakpoints (address or conditional), wait for stop, any Hatari debugger command with captured output |
 | State | save/restore full snapshots, read program console output as text |
+| GDB | `--gdb-port 2159`: registers, memory, stepi, breakpoints, watchpoints, Ctrl-C, `monitor` = Hatari debugger |
 
 * API reference: [doc/agent-api.md](doc/agent-api.md)
+* GDB: [doc/agent-gdb.md](doc/agent-gdb.md) (`gdb -x tools/agent/hatari.gdb`)
 * Design and changes to Hatari: [doc/agent-design.md](doc/agent-design.md)
 * Claude Code skill: [.claude/skills/hatari-agent/SKILL.md](.claude/skills/hatari-agent/SKILL.md)
 

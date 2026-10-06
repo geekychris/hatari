@@ -21,6 +21,7 @@ const char Options_fileid[] = "Hatari options.c";
 
 #include "main.h"
 #include "agentapi.h"
+#include "gdbstub.h"
 #include "version.h"
 #include "options.h"
 #include "configuration.h"
@@ -232,6 +233,7 @@ typedef enum {
 	OPT_AGENT_BIND,
 	OPT_AGENT_ROMDIR,
 	OPT_AGENT_DEBUGGER,
+	OPT_GDB_PORT,
 	OPT_LOGFILE,
 	OPT_LOGLEVEL,
 	OPT_ALERTLEVEL,
@@ -566,6 +568,8 @@ static const opt_t HatariOptions[] = {
 	  "<dir>", "Directory of TOS images selectable through agent API" },
 	{ OPT_AGENT_DEBUGGER, NULL, "--agent-debugger",
 	  "<bool>", "Agent API (instead of console) handles debugger stops" },
+	{ OPT_GDB_PORT, NULL, "--gdb-port",
+	  "<port>", "Serve GDB remote protocol for 68k debugging on given port" },
 #endif
 	{ OPT_LOGFILE, NULL, "--log-file",
 	  "<file>", "Save log output to <file> (default=stderr)" },
@@ -2454,6 +2458,14 @@ bool Opt_ParseParameters(int argc, const char * const argv[], int *exitval)
 				ok = Opt_Bool(arg, OPT_AGENT_DEBUGGER, &own);
 				if (ok)
 					AgentApi_SetOwnDebugger(own);
+			}
+			break;
+
+		case OPT_GDB_PORT:
+			errstr = GdbStub_SetPort(arg);
+			if (errstr)
+			{
+				return Opt_ShowError(OPT_GDB_PORT, arg, errstr);
 			}
 			break;
 

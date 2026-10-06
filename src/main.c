@@ -12,6 +12,7 @@ const char Main_fileid[] = "Hatari main.c";
 
 #include "main.h"
 #include "agentapi.h"
+#include "gdbstub.h"
 #include "version.h"
 #include "configuration.h"
 #include "control.h"
@@ -338,13 +339,15 @@ void Main_Init(int argc, char *argv[])
 	/* Check if Timing_Delay is accurate */
 	Timing_CheckForAccurateDelays();
 
-	/* Start agent API server if enabled */
+	/* Start agent API server & GDB stub if enabled */
 	AgentApi_Init();
+	GdbStub_Init();
 }
 
 
 void Main_UnInit(void)
 {
+	GdbStub_UnInit();
 	AgentApi_UnInit();
 	Control_RemoveFifo();
 

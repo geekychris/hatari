@@ -6,6 +6,7 @@ set(SOURCES
 	acia.c
 	agentapi.c
 	agenthttp.c
+	gdbstub.c
 	avi_record.c
 	bios.c
 	blitter.c

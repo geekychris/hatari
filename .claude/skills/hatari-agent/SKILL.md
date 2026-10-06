@@ -74,6 +74,15 @@ While `state` is `stopped` the CPU is frozen in the debugger. Only
 `/debug/*`, `/cpu/*`, `/mem`, `/screen`, `/status`, `/console` make sense
 until you continue. `/emu/resume` or `/emu/run` also leave the stop.
 
+## GDB (source-level / IDE debugging)
+
+Start Hatari with `--gdb-port 2159`, then `gdb -x tools/agent/hatari.gdb [prog.elf]`
+(Homebrew `gdb` supports m68k; `set endian big` is required without an m68k ELF).
+`monitor <hatari debugger cmd>` works inside GDB. Load program symbols with
+`add-symbol-file prog.elf -o 0x<TEXT>` (TEXT from `monitor info basepage`).
+Details: `doc/agent-gdb.md`. GDB and the HTTP API can be attached together;
+let one of them drive stepping at a time.
+
 ## Machines and ROMs
 
 ```sh
