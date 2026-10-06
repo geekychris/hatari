@@ -65,9 +65,12 @@ curl -s -XPOST localhost:7777/debug/break
     [frank_the_frog](examples/frank_the_frog)
   * Atari STE (same layer, plus Paula emulation on DMA sound and a C ProTracker player):
     [rock_blaster](examples/rock_blaster), [orbital_patrol](examples/orbital_patrol) (MOD music),
-    [jump_quest](examples/jump_quest)
+    [jump_quest](examples/jump_quest), [stakattack](examples/stakattack) (MOD music),
+    [dot_chase](examples/dot_chase), [lunar_rider](examples/lunar_rider) and
+    [pea_shooter_blast](examples/pea_shooter_blast) (both scrolled with the STE blitter)
   * Atari Falcon030 ([examples/falcon_port](examples/falcon_port) layer: true colour, Paula on
-    DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test)
+    DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test),
+    [void_trader](examples/void_trader) (filled 3D, trading)
 
 <table><tr>
 <td align="center"><img src="examples/uranus_lander/docs/flight.png" width="200" alt="Uranus Lander"><br>Uranus Lander (ST)</td>
@@ -78,6 +81,12 @@ curl -s -XPOST localhost:7777/debug/break
 <td align="center"><img src="examples/rock_blaster/docs/play.png" width="200" alt="Rock Blaster"><br>Rock Blaster (STE)</td>
 <td align="center"><img src="examples/orbital_patrol/docs/flight.png" width="200" alt="Orbital Patrol"><br>Orbital Patrol (STE)</td>
 <td align="center"><img src="examples/jump_quest/docs/level1.png" width="200" alt="Jump Quest"><br>Jump Quest (STE)</td>
+<td align="center"><img src="examples/stakattack/docs/play.png" width="200" alt="StakAttack"><br>StakAttack (STE)</td>
+</tr><tr>
+<td align="center"><img src="examples/dot_chase/docs/play.png" width="200" alt="Dot Chase"><br>Dot Chase (STE)</td>
+<td align="center"><img src="examples/lunar_rider/docs/ride.png" width="200" alt="Lunar Rider"><br>Lunar Rider (STE)</td>
+<td align="center"><img src="examples/pea_shooter_blast/docs/enemies.png" width="200" alt="Pea Shooter Blast"><br>Pea Shooter Blast (STE)</td>
+<td align="center"><img src="examples/void_trader/docs/combat.png" width="200" alt="Void Trader"><br>Void Trader (Falcon030)</td>
 </tr></table>
 
 ## ROMs
