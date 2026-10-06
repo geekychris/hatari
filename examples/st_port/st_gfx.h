@@ -88,6 +88,10 @@ void gfx_or16_row(struct RastPort *rp, const WORD *xs, int n, WORD y,
  */
 void gfx_copy_band(WORD y0, WORD y1);
 
+/* Column x0+i filled from logical row y0[i] to y1[i] (skip if y1 < y0)
+ * with colour col, 16 columns at a time: silhouettes, terrain bodies */
+void gfx_vspans(struct RastPort *rp, int x0, int n, const WORD *y0, const WORD *y1, int col);
+
 /* Heightmap band (terrain): column x0+i gets top_col at logical row
  * y[i] and body_col below it for body_h rows.  Much cheaper than a
  * RectFill per height change. */
@@ -160,6 +164,9 @@ void gfx_bg_commit_rows(WORD y0, WORD y1);
 /* after gfx_bg_commit_rows: have gfx_restore_back() copy those rows into
  * each screen (instead of copying them every frame) */
 void gfx_bg_dirty_rows(WORD y0, WORD y1);
+/* copy the scenery under a logical rectangle (rounded out to 16 pixel
+ * groups) into rp: games that restore what is under their own sprites */
+void gfx_bg_copy_rect(struct RastPort *rp, WORD x0, WORD y0, WORD x1, WORD y1);
 struct RastPort *gfx_hud(void);		/* HUD layer (records operations) */
 void gfx_hud_commit(void);		/* render HUD changes of this frame */
 void gfx_hud_keep(void);		/* instead of drawing + commit: HUD unchanged */
