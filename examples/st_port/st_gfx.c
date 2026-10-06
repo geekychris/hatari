@@ -112,20 +112,32 @@ static void mouse_show(void)
 	__asm__ volatile (".dc.w 0xa009" : : : "d0", "d1", "d2", "a0", "a1", "a2", "memory");
 }
 
-static void mark(struct RastPort *rp, int x0, int y0, int x1, int y1)
+static void add_dirty(struct DirtyList *d, int g0, int g1, int y0, int y1);
+
+static void mark(struct RastPort *rp, short x0, short y0, short x1, short y1)
 {
 	struct DirtyList *d = rp->dirty;
 	if (!d || d->full)
 		return;
+	short g0 = x0 >> 4, g1 = x1 >> 4;
 	if (d->n)
 	{
-		/* merge consecutive marks in the same columns */
-		int g0 = x0 >> 4, g1 = x1 >> 4;
-		if (d->r[d->n - 1].g0 == g0 && d->r[d->n - 1].g1 == g1 &&
-		    y0 <= d->r[d->n - 1].y1 + 1 && y1 >= d->r[d->n - 1].y0 - 1)
+		/* merge into the previous mark when they touch (consecutive
+		 * edges of a polygon, a sprite drawn in parts): one rectangle
+		 * instead of many overlapping ones to restore */
+		struct { WORD g0, g1, y0, y1; } *r = (void *)&d->r[d->n - 1];
+		short ug0 = g0 < r->g0 ? g0 : r->g0, ug1 = g1 > r->g1 ? g1 : r->g1;
+		short uy0 = y0 < r->y0 ? y0 : r->y0, uy1 = y1 > r->y1 ? y1 : r->y1;
+		/* touching or overlapping only: a cheap test (the 68000 has no
+		 * fast 32 bit multiply for an area heuristic) */
+		int merge = g0 <= r->g1 + 1 && g1 >= r->g0 - 1 &&
+			    y0 <= r->y1 + 1 && y1 >= r->y0 - 1;
+		if (merge)
 		{
-			if (y0 < d->r[d->n - 1].y0) d->r[d->n - 1].y0 = y0;
-			if (y1 > d->r[d->n - 1].y1) d->r[d->n - 1].y1 = y1;
+			r->g0 = ug0;
+			r->g1 = ug1;
+			r->y0 = uy0;
+			r->y1 = uy1;
 			return;
 		}
 	}
@@ -134,8 +146,8 @@ static void mark(struct RastPort *rp, int x0, int y0, int x1, int y1)
 		d->full = 1;
 		return;
 	}
-	d->r[d->n].g0 = x0 >> 4;
-	d->r[d->n].g1 = x1 >> 4;
+	d->r[d->n].g0 = g0;
+	d->r[d->n].g1 = g1;
 	d->r[d->n].y0 = y0;
 	d->r[d->n].y1 = y1;
 	d->n++;
@@ -187,14 +199,18 @@ void SetAPen(struct RastPort *rp, ULONG pen) { rp->apen = pen & 15; }
 
 /* fill whole RastPort; on the HUD layer the background already is the
  * scenery, so it's ignored there (use scenery colour 0 = cleared) */
+void fill_movem(void *end, long blocks, ULONG a, ULONG b);
+
 void SetRast(struct RastPort *rp, ULONG pen)
 {
-	UBYTE old = rp->apen;
 	if (rp->record)
 		return;
-	rp->apen = pen & 15;
-	RectFill(rp, 0, 0, 319, 255);
-	rp->apen = old;
+	/* whole buffer with movem stores (games that redraw every frame) */
+	const UWORD *c = cmask[pen & 15];
+	fill_movem((UBYTE *)rp->base + SCR_BYTES, SCR_BYTES / 32,
+		   (ULONG)c[0] << 16 | c[1], (ULONG)c[2] << 16 | c[3]);
+	if (rp->dirty)
+		rp->dirty->full = 1;
 }
 void SetBPen(struct RastPort *rp, ULONG pen) { rp->bpen = pen & 15; }
 
@@ -206,6 +222,60 @@ void Move(struct RastPort *rp, WORD x, WORD y)
 
 static void record(struct RastPort *rp, int type, int x0, int y0, int x1, int y1,
                    const char *text, int len);
+
+/*
+ * Bresenham line (physical coordinates).  The word pointer and bit mask
+ * step along with x/y instead of being recomputed per pixel, and the
+ * loop is specialised per colour so each plane is a plain OR or AND
+ * (about 2x faster than a generic masked write: vector games draw many
+ * lines).  Lines entirely on screen skip the per-pixel clipping test.
+ * In OR mode (gfx_or_mode) only the colour's 1 planes are written.
+ */
+#define LINE_PLANE(i, c, OR) do {						\
+		if ((c) >> (i) & 1) q[i] |= bit;				\
+		else if (!(OR)) q[i] &= ~bit;					\
+	} while (0)
+#define LINE_LOOP(c, CLIP, OR) for (;;) {					\
+		if (!(CLIP) || ((unsigned)x0 < SCR_W && (unsigned)y0 < SCR_H)) {	\
+			LINE_PLANE(0, c, OR); LINE_PLANE(1, c, OR);		\
+			LINE_PLANE(2, c, OR); LINE_PLANE(3, c, OR);		\
+		}								\
+		if (!n--)							\
+			break;							\
+		short e2 = err + err;						\
+		if (e2 >= dy) {							\
+			err += dy; x0 += sx;					\
+			if (sx > 0) { if (!(bit >>= 1)) { bit = 0x8000; q += 4; } }	\
+			else if (!(bit = (UWORD)(bit << 1))) { bit = 1; q -= 4; }	\
+		}								\
+		if (e2 <= dx) { err += dx; y0 += sy; q += rowstep; }		\
+	}
+#define LINE_CASE(c) case c:							\
+	if (ormode) { if (clip) LINE_LOOP(c, 1, 1) else LINE_LOOP(c, 0, 1) }	\
+	else { if (clip) LINE_LOOP(c, 1, 0) else LINE_LOOP(c, 0, 0) }		\
+	break;
+
+static void line(UWORD *base, short x0, short y0, short x1, short y1, int col, int ormode)
+{
+	short dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
+	short dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
+	short err = dx + dy, n = dx > -dy ? dx : -dy;
+	short rowstep = sy > 0 ? SCR_BYTES / SCR_H / 2 : -(SCR_BYTES / SCR_H / 2);
+	int clip = (unsigned)x0 >= SCR_W || (unsigned)x1 >= SCR_W ||
+		   (unsigned)y0 >= SCR_H || (unsigned)y1 >= SCR_H;
+	/* pointer for the start pixel even if it is off screen: it is only
+	 * dereferenced for on-screen pixels, and it steps consistently */
+	UWORD *q = base + (long)y0 * (SCR_BYTES / SCR_H / 2) + ((x0 >> 4) << 2);
+	UWORD bit = 0x8000 >> (x0 & 15);
+
+	switch (col & 15)
+	{
+	LINE_CASE(0) LINE_CASE(1) LINE_CASE(2) LINE_CASE(3)
+	LINE_CASE(4) LINE_CASE(5) LINE_CASE(6) LINE_CASE(7)
+	LINE_CASE(8) LINE_CASE(9) LINE_CASE(10) LINE_CASE(11)
+	LINE_CASE(12) LINE_CASE(13) LINE_CASE(14) LINE_CASE(15)
+	}
+}
 
 void WritePixel(struct RastPort *rp, WORD x, WORD y)
 {
@@ -231,9 +301,9 @@ void Draw(struct RastPort *rp, WORD x, WORD y)
 		rp->cy = y;
 		return;
 	}
-	int x0 = rp->cx, y0 = map_y(rp->cy), x1 = x, y1 = map_y(y);
-	int bx0 = x0 < x1 ? x0 : x1, bx1 = x0 < x1 ? x1 : x0;
-	int by0 = y0 < y1 ? y0 : y1, by1 = y0 < y1 ? y1 : y0;
+	short x0 = rp->cx, y0 = map_y(rp->cy), x1 = x, y1 = map_y(y);
+	short bx0 = x0 < x1 ? x0 : x1, bx1 = x0 < x1 ? x1 : x0;
+	short by0 = y0 < y1 ? y0 : y1, by1 = y0 < y1 ? y1 : y0;
 
 	rp->cx = x;
 	rp->cy = y;
@@ -262,31 +332,7 @@ void Draw(struct RastPort *rp, WORD x, WORD y)
 		}
 	}
 	else
-	{
-		/* Bresenham */
-		UWORD m[4];
-		int dx = x1 > x0 ? x1 - x0 : x0 - x1, sx = x0 < x1 ? 1 : -1;
-		int dy = y1 > y0 ? y0 - y1 : y1 - y0, sy = y0 < y1 ? 1 : -1;
-		int err = dx + dy;
-		color_masks(rp->apen, m);
-		for (;;)
-		{
-			if ((unsigned)x0 < SCR_W && (unsigned)y0 < SCR_H)
-			{
-				UWORD *q = rp->base + row_off[y0] + ((x0 >> 4) << 2);
-				UWORD bit = 0x8000 >> (x0 & 15), nbit = ~bit;
-				q[0] = (q[0] & nbit) | (bit & m[0]);
-				q[1] = (q[1] & nbit) | (bit & m[1]);
-				q[2] = (q[2] & nbit) | (bit & m[2]);
-				q[3] = (q[3] & nbit) | (bit & m[3]);
-			}
-			if (x0 == x1 && y0 == y1)
-				break;
-			int e2 = 2 * err;
-			if (e2 >= dy) { err += dy; x0 += sx; }
-			if (e2 <= dx) { err += dx; y0 += sy; }
-		}
-	}
+		line(rp->base, x0, y0, x1, y1, rp->apen, rp->ormode);
 	if (bx0 < 0) bx0 = 0;
 	if (by0 < 0) by0 = 0;
 	if (bx1 >= SCR_W) bx1 = SCR_W - 1;
@@ -301,7 +347,17 @@ void RectFill(struct RastPort *rp, WORD x0, WORD y0, WORD x1, WORD y1)
 		record(rp, OP_RECT, x0, y0, x1, y1, NULL, 0);
 		return;
 	}
-	int py0 = map_y(y0), py1 = map_y(y1);
+	short py0 = map_y(y0), py1 = map_y(y1);
+	if (x0 == x1 && py0 == py1)
+	{
+		/* single pixel (particles, radar dots): no span setup */
+		if ((unsigned)x0 < SCR_W && (unsigned)py0 < SCR_H)
+		{
+			group_set(rp->base + row_off[py0] + ((x0 >> 4) << 2), 0x8000 >> (x0 & 15), cmask[rp->apen]);
+			mark(rp, x0, py0, x0, py0);
+		}
+		return;
+	}
 	if (x0 < 0) x0 = 0;
 	if (x1 >= SCR_W) x1 = SCR_W - 1;
 	if (py0 < 0) py0 = 0;
@@ -325,13 +381,13 @@ void RectFill(struct RastPort *rp, WORD x0, WORD y0, WORD x1, WORD y1)
 	else
 	{
 		const UWORD *c = cmask[rp->apen];
-		int g0 = x0 >> 4, g1 = x1 >> 4;
+		short g0 = x0 >> 4, g1 = x1 >> 4;
 		UWORD lmask = 0xffff >> (x0 & 15), rmask = 0xffff << (15 - (x1 & 15));
 		UWORD *row = rp->base + row_off[py0] + (g0 << 2);
 		if (g0 == g1)
 		{
 			UWORD m = lmask & rmask;
-			for (int y = py0; y <= py1; y++, row += LINE_W)
+			for (short y = py0; y <= py1; y++, row += LINE_W)
 				group_set(row, m, c);
 		}
 		else
@@ -355,6 +411,79 @@ void RectFill(struct RastPort *rp, WORD x0, WORD y0, WORD x1, WORD y1)
 /* 8x8 text, Amiga JAM2 mode: background drawn in BPen.
  * Cursor y is the baseline like topaz/8 (glyph top = baseline - 6).
  */
+/*
+ * Text glyph cache: games redraw the same strings every frame, and
+ * assembling shifted 8 pixel glyphs into plane words is slow on a 68000
+ * (variable shifts).  The assembled bit rows of a string depend only on
+ * its characters, its x position within a 16 pixel group and vertical
+ * clipping, so they are kept (LRU) and reused wherever it is drawn.
+ */
+#define TC_ENTRIES 48
+#define TC_MAXLEN  40
+#define TC_WORDS   ((TC_MAXLEN * 8 + 15) / 16 + 1)
+static struct {
+	char s[TC_MAXLEN];
+	UBYTE len, shift, r0, r1;
+	ULONG used;
+	UWORD bits[8 * TC_WORDS];
+} tcache[TC_ENTRIES];
+static ULONG tc_clock;
+static UWORD tc_scratch[8 * (SCR_W / 16 + 2)];
+
+static void text_assemble(UWORD *out, const char *str, int n, int shift0, int nw, int r0, int r1)
+{
+	for (int r = r0; r <= r1; r++, out += nw)
+	{
+		int sh = shift0;
+		UWORD *bw = out;
+		for (int w = 0; w < nw; w++)
+			out[w] = 0;
+		for (int c = 0; c < n; c++)
+		{
+			UWORD g = (UWORD)font_data[((UBYTE)str[c] - font_first) + r * font_width] << 8;
+			bw[0] |= g >> sh;
+			if (sh > 8)
+				bw[1] |= g << (16 - sh);
+			sh += 8;
+			if (sh >= 16)
+			{
+				sh -= 16;
+				bw++;
+			}
+		}
+	}
+}
+
+static const UWORD *text_bits(const char *str, int n, int shift0, int nw, int r0, int r1)
+{
+	int i, lru = 0;
+	if (n > TC_MAXLEN)
+	{
+		text_assemble(tc_scratch, str, n, shift0, nw, r0, r1);
+		return tc_scratch;
+	}
+	tc_clock++;
+	for (i = 0; i < TC_ENTRIES; i++)
+	{
+		if (tcache[i].len == n && tcache[i].shift == shift0 && tcache[i].r0 == r0 &&
+		    tcache[i].r1 == r1 && !memcmp(tcache[i].s, str, n))
+		{
+			tcache[i].used = tc_clock;
+			return tcache[i].bits;
+		}
+		if (tcache[i].used < tcache[lru].used)
+			lru = i;
+	}
+	memcpy(tcache[lru].s, str, n);
+	tcache[lru].len = n;
+	tcache[lru].shift = shift0;
+	tcache[lru].r0 = r0;
+	tcache[lru].r1 = r1;
+	tcache[lru].used = tc_clock;
+	text_assemble(tcache[lru].bits, str, n, shift0, nw, r0, r1);
+	return tcache[lru].bits;
+}
+
 void Text(struct RastPort *rp, const char *str, ULONG len)
 {
 	if (rp->record)
@@ -368,47 +497,51 @@ void Text(struct RastPort *rp, const char *str, ULONG len)
 	UWORD fgm[4], bgm[4];
 	int r0 = top < 0 ? -top : 0, r1 = top + 7 >= SCR_H ? SCR_H - 1 - top : 7;
 
-	color_masks(rp->apen, fgm);
-	color_masks(rp->bpen, bgm);
-	for (ULONG i = 0; i < len; i++, x += 8)
+	/* Whole string per scan row: the row's glyph bits go into a word
+	 * buffer, then each plane word is written once (JAM2: inside the
+	 * string the background is drawn too, so only the two edge words
+	 * need a read).  Characters outside the screen are dropped, like
+	 * before. */
+	int c0 = x < 0 ? (-x + 7) / 8 : 0;		/* first visible char */
+	int c1 = (int)len;
+	if (x + 8 * c1 > SCR_W)
+		c1 = (SCR_W - x) / 8;			/* chars that fit */
+	x += 8 * len;
+	if (c0 < c1 && r0 <= r1)
 	{
-		if (x < 0 || x > SCR_W - 8)
-			continue;
-		const UBYTE *glyph = font_data + ((UBYTE)str[i] - font_first) + r0 * font_width;
-		int shift = x & 15;
-		UWORD *p = rp->base + row_off[top + r0] + ((x >> 4) << 2);
+		int px0 = x_start + 8 * c0, px1 = x_start + 8 * c1;	/* [px0, px1) */
+		int g0 = px0 >> 4, g1 = (px1 - 1) >> 4, nw = g1 - g0 + 1;
+		UWORD lmask = 0xffff >> (px0 & 15), rmask = 0xffff << (15 - ((px1 - 1) & 15));
+		int shift0 = px0 - (g0 << 4);
 
-		if (shift <= 8)
+		color_masks(rp->apen, fgm);
+		color_masks(rp->bpen, bgm);
+		const UWORD *cbits = text_bits(str + c0, c1 - c0, shift0, nw, r0, r1);
+		UWORD *row = rp->base + row_off[top + r0] + (g0 << 2);
+		for (int r = r0; r <= r1; r++, row += LINE_W, cbits += nw)
 		{
-			/* glyph fits in one 16 pixel group */
-			UWORD cell = 0xff00 >> shift, keep = ~cell;
-			for (int r = r0; r <= r1; r++, glyph += font_width, p += LINE_W)
+			const UWORD *bits = cbits;
+			UWORD *q = row;
+			for (int w = 0; w < nw; w++, q += 4)
 			{
-				UWORD f = ((UWORD)*glyph << 8) >> shift, b = cell & ~f;
-				p[0] = (p[0] & keep) | (f & fgm[0]) | (b & bgm[0]);
-				p[1] = (p[1] & keep) | (f & fgm[1]) | (b & bgm[1]);
-				p[2] = (p[2] & keep) | (f & fgm[2]) | (b & bgm[2]);
-				p[3] = (p[3] & keep) | (f & fgm[3]) | (b & bgm[3]);
-			}
-		}
-		else
-		{
-			/* straddles two groups */
-			UWORD c1 = 0xff00 >> shift, c2 = 0xff00 << (16 - shift);
-			UWORD k1 = ~c1, k2 = ~c2;
-			for (int r = r0; r <= r1; r++, glyph += font_width, p += LINE_W)
-			{
-				UWORD g = (UWORD)*glyph << 8;
-				UWORD f1 = g >> shift, b1 = c1 & ~f1;
-				UWORD f2 = g << (16 - shift), b2 = c2 & ~f2;
-				p[0] = (p[0] & k1) | (f1 & fgm[0]) | (b1 & bgm[0]);
-				p[1] = (p[1] & k1) | (f1 & fgm[1]) | (b1 & bgm[1]);
-				p[2] = (p[2] & k1) | (f1 & fgm[2]) | (b1 & bgm[2]);
-				p[3] = (p[3] & k1) | (f1 & fgm[3]) | (b1 & bgm[3]);
-				p[4] = (p[4] & k2) | (f2 & fgm[0]) | (b2 & bgm[0]);
-				p[5] = (p[5] & k2) | (f2 & fgm[1]) | (b2 & bgm[1]);
-				p[6] = (p[6] & k2) | (f2 & fgm[2]) | (b2 & bgm[2]);
-				p[7] = (p[7] & k2) | (f2 & fgm[3]) | (b2 & bgm[3]);
+				UWORD f = bits[w], b = ~f;
+				UWORD cover = (w == 0 ? lmask : 0xffff) & (w == nw - 1 ? rmask : 0xffff);
+				if (cover == 0xffff)
+				{
+					q[0] = (f & fgm[0]) | (b & bgm[0]);
+					q[1] = (f & fgm[1]) | (b & bgm[1]);
+					q[2] = (f & fgm[2]) | (b & bgm[2]);
+					q[3] = (f & fgm[3]) | (b & bgm[3]);
+				}
+				else
+				{
+					UWORD keep = ~cover;
+					b &= cover;
+					q[0] = (q[0] & keep) | (f & fgm[0]) | (b & bgm[0]);
+					q[1] = (q[1] & keep) | (f & fgm[1]) | (b & bgm[1]);
+					q[2] = (q[2] & keep) | (f & fgm[2]) | (b & bgm[2]);
+					q[3] = (q[3] & keep) | (f & fgm[3]) | (b & bgm[3]);
+				}
 			}
 		}
 	}
@@ -424,10 +557,34 @@ void Text(struct RastPort *rp, const char *str, ULONG len)
 /* ------------------------------------------------------------------ */
 /* display management */
 
+static UBYTE old_sync, old_mste = 0xff;
+
+static long gfx_cookie(ULONG id)
+{
+	long *jar = *(long **)0x5a0;
+	if (!jar)
+		return -1;
+	for (; jar[0]; jar += 2)
+		if ((ULONG)jar[0] == id)
+			return jar[1];
+	return -1;
+}
+
 int gfx_init(const UWORD *pal, int n)
 {
 	WORD stpal[16];
 	UBYTE *p;
+
+	/* PAL 50 Hz like the Amiga games: the ports pace game updates by
+	 * the VBL (a US TOS boots in 60 Hz, which would run them 20% fast) */
+	old_sync = *(volatile UBYTE *)0xffff820a;
+	*(volatile UBYTE *)0xffff820a = old_sync | 2;
+	/* Mega STE: 16 MHz with cache (CPU bound ports run up to 2x) */
+	if (gfx_cookie(0x5f4d4348) == 0x00010010)	/* '_MCH' Mega STE */
+	{
+		old_mste = *(volatile UBYTE *)0xffff8e21;
+		*(volatile UBYTE *)0xffff8e21 = 3;
+	}
 
 	for (int y = 0; y < SCR_H; y++)
 		row_off[y] = y * LINE_W;
@@ -490,6 +647,9 @@ int gfx_init(const UWORD *pal, int n)
 void gfx_exit(void)
 {
 	Vsync();
+	*(volatile UBYTE *)0xffff820a = old_sync;
+	if (old_mste != 0xff)
+		*(volatile UBYTE *)0xffff8e21 = old_mste;
 	Setscreen(old_log, old_phys, old_rez);
 	Setpalette(old_pal);
 	Vsync();
@@ -552,6 +712,274 @@ void gfx_fill_band(WORD y0, WORD y1, int col)
 	fill_movem(end, n / 32, a, b);
 }
 
+/*
+ * Heightmap band: for columns x0 .. x0+n-1, logical row y[i] gets
+ * top_col and rows y[i]+1 .. y[i]+body_h get body_col (terrain with a
+ * highlighted surface).  Works 16 columns at a time: each column ORs
+ * its bit into per-row masks, then every row of the group is written
+ * once per plane, instead of one rectangle per height change.
+ */
+void gfx_column_band(struct RastPort *rp, const WORD *y, int n, int x0,
+		     int top_col, int body_col, int body_h)
+{
+	UWORD mt[SCR_H], mb[SCR_H];
+	WORD ct[16], cb[16];
+	UWORD selt[4], selb[4];
+	short x = x0, i = 0;
+
+	for (int pl = 0; pl < 4; pl++)
+	{
+		selt[pl] = (top_col >> pl) & 1 ? 0xffff : 0;
+		selb[pl] = (body_col >> pl) & 1 ? 0xffff : 0;
+	}
+	while (i < n)
+	{
+		short g = x >> 4, s0 = x & 15, cnt = 16 - s0;
+		short rmin = SCR_H, rmax = -1, k;
+		if (cnt > n - i)
+			cnt = n - i;
+		if (g < 0 || g >= SCR_W / 16)
+		{
+			x += cnt;
+			i += cnt;
+			continue;
+		}
+		/* physical top / body rows of the group's columns */
+		const WORD *yy = y + i;
+		for (k = 0; k < cnt; k++)
+		{
+			short ly = yy[k], t, b;
+			t = ly < YMAP_MIN ? -1 : ly > YMAP_MAX ? SCR_H : ymap[ly - YMAP_MIN];
+			ly += body_h;
+			b = ly < YMAP_MIN ? -1 : ly > YMAP_MAX ? SCR_H - 1 : ymap[ly - YMAP_MIN];
+			if (b >= SCR_H) b = SCR_H - 1;
+			ct[k] = t;
+			cb[k] = b;
+			if (t >= SCR_H || b < 0)
+				continue;
+			if (t < rmin) rmin = t < 0 ? 0 : t;
+			if (b > rmax) rmax = b;
+		}
+		if (rmax >= rmin)
+		{
+			UWORD bit = 0x8000 >> s0;
+			for (short r = rmin; r <= rmax; r++)
+				mt[r] = mb[r] = 0;
+			for (k = 0; k < cnt; k++, bit >>= 1)
+			{
+				short t = ct[k], b = cb[k], r;
+				if (t >= SCR_H || b < 0)
+					continue;
+				if (t >= 0)
+					mt[t] |= bit;
+				for (r = t < 0 ? 0 : t + 1; r <= b; r++)
+					mb[r] |= bit;
+			}
+			UWORD *p = rp->base + row_off[rmin] + (g << 2);
+			for (short r = rmin; r <= rmax; r++, p += LINE_W)
+			{
+				UWORD t = mt[r], bb = mb[r] & ~t, keep = ~(t | bb);
+				if (keep == 0xffff)
+					continue;
+				p[0] = (p[0] & keep) | (t & selt[0]) | (bb & selb[0]);
+				p[1] = (p[1] & keep) | (t & selt[1]) | (bb & selb[1]);
+				p[2] = (p[2] & keep) | (t & selt[2]) | (bb & selb[2]);
+				p[3] = (p[3] & keep) | (t & selt[3]) | (bb & selb[3]);
+			}
+			if (rp->dirty)
+				mark(rp, g << 4, rmin, (g << 4) + 15, rmax);
+		}
+		x += cnt;
+		i += cnt;
+	}
+}
+
+/*
+ * Prepared heightmap (scrolling terrain): physical rows per world column
+ * are computed once, then each frame only does, per column, two table
+ * reads, one OR for the top row and a dbra loop for the body rows
+ * (assembly below), then writes each touched row of a 16 column group
+ * once per plane.
+ */
+struct gfx_heightmap {
+	int n;
+	UWORD *top2;		/* physical top row * 2 (byte offset in mask arrays) */
+	UWORD *cnt;		/* body rows - 1 (dbra count), 0xffff: none */
+	UWORD *bot;		/* physical bottom row */
+	UWORD *wmin, *wmax;	/* row range of columns i .. i+15 (wrapping) */
+};
+
+gfx_heightmap *gfx_heightmap_prepare(const WORD *y, int n, int body_h)
+{
+	gfx_heightmap *h = (gfx_heightmap *)Malloc(sizeof(*h) + (long)n * 10);
+	if (!h || (long)h < 0)
+		return NULL;
+	h->n = n;
+	h->top2 = (UWORD *)(h + 1);
+	h->cnt = h->top2 + n;
+	h->bot = h->cnt + n;
+	h->wmin = h->bot + n;
+	h->wmax = h->wmin + n;
+	for (int i = 0; i < n; i++)
+	{
+		int t = map_y(y[i]), b = map_y(y[i] + body_h);
+		if (t < 0) t = 0;
+		if (t > SCR_H - 1) t = SCR_H - 1;
+		if (b > SCR_H - 1) b = SCR_H - 1;
+		if (b < t) b = t;
+		h->top2[i] = t * 2;
+		h->cnt[i] = b > t ? b - t - 1 : 0xffff;
+		h->bot[i] = b;
+	}
+	for (int i = 0; i < n; i++)
+	{
+		int mn = SCR_H, mx = -1;
+		for (int k = 0, j = i; k < 16; k++, j = j + 1 < n ? j + 1 : 0)
+		{
+			int t = h->top2[j] >> 1;
+			if (t < mn) mn = t;
+			if (h->bot[j] > mx) mx = h->bot[j];
+		}
+		h->wmin[i] = mn;
+		h->wmax[i] = mx;
+	}
+	return h;
+}
+
+void gfx_heightmap_free(gfx_heightmap *h)
+{
+	if (h)
+		Mfree(h);
+}
+
+void gfx_heightmap_rows(const gfx_heightmap *h, int start, int *y0, int *y1)
+{
+	int mn = SCR_H, mx = -1, wx = start % h->n;
+	if (wx < 0)
+		wx += h->n;
+	for (int g = 0; g < SCR_W / 16; g++)
+	{
+		if (h->wmin[wx] < mn) mn = h->wmin[wx];
+		if (h->wmax[wx] > mx) mx = h->wmax[wx];
+		wx += 16;
+		if (wx >= h->n)
+			wx -= h->n;
+	}
+	*y0 = mn;
+	*y1 = mx;
+}
+
+/* OR the bits of 'cnt' columns into the masks: mt[top] for the top row,
+ * mb[top+1 .. top+cnt+1] for the body.  bit = first column's bit. */
+void hm_columns(const UWORD *top2, const UWORD *cnt, int n, UWORD bit,
+		UWORD *mt, UWORD *mb);
+__asm__(
+	"	.text\n"
+	"	.globl	hm_columns\n"
+	"hm_columns:\n"
+	"	movem.l	%d2-%d4/%a2-%a5,-(%sp)\n"
+	"	movem.l	32(%sp),%a0-%a1\n"		/* top2, cnt */
+	"	move.l	40(%sp),%d2\n"			/* n */
+	"	move.l	44(%sp),%d3\n"			/* bit */
+	"	movem.l	48(%sp),%a2-%a3\n"		/* mt, mb */
+	"	subq.w	#1,%d2\n"
+	"	bmi.s	9f\n"
+	"1:	move.w	(%a0)+,%d0\n"			/* top * 2 */
+	"	or.w	%d3,(%a2,%d0.w)\n"
+	"	move.w	(%a1)+,%d1\n"			/* body rows - 1 */
+	"	bmi.s	3f\n"
+	"	lea	2(%a3,%d0.w),%a4\n"
+	"2:	or.w	%d3,(%a4)+\n"
+	"	dbra	%d1,2b\n"
+	"3:	lsr.w	#1,%d3\n"
+	"	dbra	%d2,1b\n"
+	"9:	movem.l	(%sp)+,%d2-%d4/%a2-%a5\n"
+	"	rts\n"
+);
+
+static void heightmap_draw(struct RastPort *rp, const gfx_heightmap *h, int start,
+			   int top_col, int body_col, int fresh);
+
+void gfx_heightmap_draw(struct RastPort *rp, const gfx_heightmap *h, int start,
+			int top_col, int body_col)
+{
+	heightmap_draw(rp, h, start, top_col, body_col, 0);
+}
+
+void gfx_heightmap_draw_fresh(struct RastPort *rp, const gfx_heightmap *h, int start,
+			      int top_col, int body_col)
+{
+	heightmap_draw(rp, h, start, top_col, body_col, 1);
+}
+
+static void heightmap_draw(struct RastPort *rp, const gfx_heightmap *h, int start,
+			   int top_col, int body_col, int fresh)
+{
+	UWORD mt[SCR_H], mb[SCR_H];
+	UWORD selt[4], selb[4];
+	short wx = start % h->n;
+
+	if (wx < 0)
+		wx += h->n;
+	for (int pl = 0; pl < 4; pl++)
+	{
+		selt[pl] = (top_col >> pl) & 1 ? 0xffff : 0;
+		selb[pl] = (body_col >> pl) & 1 ? 0xffff : 0;
+	}
+	for (short g = 0; g < SCR_W / 16; g++)
+	{
+		short rmin = h->wmin[wx], rmax = h->wmax[wx], k;
+		for (short r = rmin; r <= rmax; r++)
+			mt[r] = mb[r] = 0;
+		k = h->n - wx;			/* columns before the wrap */
+		if (k >= 16)
+			hm_columns(h->top2 + wx, h->cnt + wx, 16, 0x8000, mt, mb);
+		else
+		{
+			hm_columns(h->top2 + wx, h->cnt + wx, k, 0x8000, mt, mb);
+			hm_columns(h->top2, h->cnt, 16 - k, 0x8000 >> k, mt, mb);
+		}
+		wx += 16;
+		if (wx >= h->n)
+			wx -= h->n;
+		UWORD *p = rp->base + row_off[rmin] + (g << 2);
+		if (fresh)
+			/* rows were just cleared to colour 0: plain writes */
+			for (short r = rmin; r <= rmax; r++, p += LINE_W)
+			{
+				UWORD t = mt[r], bb = mb[r] & ~t;
+				p[0] = (t & selt[0]) | (bb & selb[0]);
+				p[1] = (t & selt[1]) | (bb & selb[1]);
+				p[2] = (t & selt[2]) | (bb & selb[2]);
+				p[3] = (t & selt[3]) | (bb & selb[3]);
+			}
+		else
+			for (short r = rmin; r <= rmax; r++, p += LINE_W)
+			{
+				UWORD t = mt[r], bb = mb[r] & ~t, keep = ~(t | bb);
+				if (keep == 0xffff)
+					continue;
+				p[0] = (p[0] & keep) | (t & selt[0]) | (bb & selb[0]);
+				p[1] = (p[1] & keep) | (t & selt[1]) | (bb & selb[1]);
+				p[2] = (p[2] & keep) | (t & selt[2]) | (bb & selb[2]);
+				p[3] = (p[3] & keep) | (t & selt[3]) | (bb & selb[3]);
+			}
+		if (rp->dirty)
+			mark(rp, g << 4, rmin, (g << 4) + 15, rmax);
+	}
+}
+
+void gfx_fill_rows(int py0, int py1, int col)
+{
+	if (py0 < 0) py0 = 0;
+	if (py1 >= SCR_H) py1 = SCR_H - 1;
+	if (py0 > py1)
+		return;
+	const UWORD *c = cmask[col & 15];
+	fill_movem((UBYTE *)(screen[back] + row_off[py1] + LINE_W), (long)(py1 - py0 + 1) * (LINE_W * 2) / 32,
+		   (ULONG)c[0] << 16 | c[1], (ULONG)c[2] << 16 | c[3]);
+}
+
 void gfx_copy_band(WORD y0, WORD y1)
 {
 	int py0 = map_y(y0), py1 = map_y(y1);
@@ -565,6 +993,28 @@ void gfx_copy_band(WORD y0, WORD y1)
 void gfx_bg_clear(void)
 {
 	memset(scenery, 0, SCR_BYTES);
+}
+
+void gfx_bg_commit_rows(WORD y0, WORD y1)
+{
+	int py0 = map_y(y0), py1 = map_y(y1);
+	if (py0 < 0) py0 = 0;
+	if (py1 >= SCR_H) py1 = SCR_H - 1;
+	if (py0 <= py1)
+		memcpy(bgscreen + row_off[py0], scenery + row_off[py0],
+		       (py1 - py0 + 1) * LINE_W * 2);
+}
+
+void gfx_bg_dirty_rows(WORD y0, WORD y1)
+{
+	int py0 = map_y(y0), py1 = map_y(y1);
+	if (py0 < 0) py0 = 0;
+	if (py1 >= SCR_H) py1 = SCR_H - 1;
+	if (py0 <= py1)
+	{
+		add_dirty(&dirty[0], 0, SCR_W / 16 - 1, py0, py1);
+		add_dirty(&dirty[1], 0, SCR_W / 16 - 1, py0, py1);
+	}
 }
 
 void gfx_bg_to_screens(void)
@@ -951,15 +1401,34 @@ void gfx_hud_commit(void)
 		n_erased++;
 	}
 
-	/* draw new operations, and old ones hit by an erase */
+	/* draw new operations, and old ones hit by an erase or drawn over
+	 * by an earlier redrawn one (painter's order: a HUD background
+	 * rectangle redrawn because one number changed must not cover the
+	 * unchanged labels drawn after it) */
+	enum { MAX_AREAS = 16 };
+	struct Op area[MAX_AREAS];
+	int drawn = 0;
 	for (i = 0; i < n_cur; i++)
 	{
 		struct Op *c = &cur_ops[i];
 		int draw = !c->matched;
 		for (j = 0; !draw && n_erased && j < n_prev; j++)
 			draw = prev_ops[j].type == 0xff && op_overlaps(c, &prev_ops[j]);
+		for (j = 0; !draw && j < drawn; j++)
+			draw = op_overlaps(c, &area[j]);
 		if (draw)
 		{
+			if (drawn < MAX_AREAS)
+				area[drawn++] = *c;
+			else
+			{
+				/* too many: widen the last one */
+				struct Op *a = &area[MAX_AREAS - 1];
+				if (c->g0 < a->g0) a->g0 = c->g0;
+				if (c->g1 > a->g1) a->g1 = c->g1;
+				if (c->by0 < a->by0) a->by0 = c->by0;
+				if (c->by1 > a->by1) a->by1 = c->by1;
+			}
 			op_draw(c);
 			add_dirty(&dirty[0], c->g0, c->g1, c->by0, c->by1);
 			add_dirty(&dirty[1], c->g0, c->g1, c->by0, c->by1);
@@ -988,6 +1457,11 @@ void gfx_restore_back(void)
 
 static int min_vbls = 1;
 static long last_swap;
+
+void gfx_or_mode(int on)
+{
+	rp_screen[0].ormode = rp_screen[1].ormode = on;
+}
 
 void gfx_set_frame_vbls(int n)
 {
@@ -1217,6 +1691,63 @@ gfx_sprite *gfx_sprite_build_on(gfx_draw_fn fn, const void *ctx, WORD arg, WORD 
 	}
 	Mfree(img);
 	return spr;
+}
+
+/* draw at logical x, y instead of the build row (objects moving
+ * vertically: the 256 -> 200 line mapping of the build row is reused,
+ * at most one row off).  Clipped at all edges.  In OR mode (sprites
+ * over colour 0, see gfx_or_mode) the plane words are only ORed in. */
+void gfx_sprite_draw_xy(struct RastPort *rp, const gfx_sprite *spr, WORD x, WORD y)
+{
+	int g0 = x >> 4, ng, gskip = 0, gcount, r0 = 0, rows, py;
+	const UWORD *d;
+
+	if (!spr)
+		return;
+	ng = gcount = spr->groups;
+	rows = spr->rows;
+	py = y < 0 ? -(int)GFX_Y(-y) : GFX_Y(y);
+	if (x <= -16 * ng || x >= SCR_W || py >= SCR_H || py + rows <= 0)
+		return;
+	d = spr->data[x & 15];
+	if (g0 < 0)
+	{
+		gskip = -g0;
+		gcount -= gskip;
+		g0 = 0;
+	}
+	if (g0 + gcount > SCR_W / 16)
+		gcount = SCR_W / 16 - g0;
+	if (py < 0)
+	{
+		r0 = -py;
+		py = 0;
+	}
+	if (py + rows - r0 > SCR_H)
+		rows = SCR_H - py + r0;
+	for (int r = r0; r < rows; r++)
+	{
+		UWORD *q = rp->base + row_off[py + r - r0] + (g0 << 2);
+		const UWORD *s = d + (r * ng + gskip) * 5;
+		for (int g = 0; g < gcount; g++, q += 4, s += 5)
+		{
+			UWORD m = s[0];
+			if (!m)
+				continue;
+			if (rp->ormode)
+			{
+				q[0] |= s[1]; q[1] |= s[2]; q[2] |= s[3]; q[3] |= s[4];
+				continue;
+			}
+			UWORD k = ~m;
+			q[0] = (q[0] & k) | (s[1] & m);
+			q[1] = (q[1] & k) | (s[2] & m);
+			q[2] = (q[2] & k) | (s[3] & m);
+			q[3] = (q[3] & k) | (s[4] & m);
+		}
+	}
+	if (rp->dirty && gcount > 0)
+		mark(rp, g0 << 4, py, ((g0 + gcount) << 4) - 1, py + rows - r0 - 1);
 }
 
 void gfx_sprite_draw(struct RastPort *rp, const gfx_sprite *spr, WORD x)

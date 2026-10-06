@@ -63,6 +63,9 @@ curl -s -XPOST localhost:7777/debug/break
     [uranus_lander](examples/uranus_lander) (with an autopilot),
     [nova_defense](examples/nova_defense) (with a bot),
     [frank_the_frog](examples/frank_the_frog)
+  * Atari STE (same layer, plus Paula emulation on DMA sound and a C ProTracker player):
+    [rock_blaster](examples/rock_blaster), [orbital_patrol](examples/orbital_patrol) (MOD music),
+    [jump_quest](examples/jump_quest)
   * Atari Falcon030 ([examples/falcon_port](examples/falcon_port) layer: true colour, Paula on
     DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test)
 
@@ -71,6 +74,10 @@ curl -s -XPOST localhost:7777/debug/break
 <td align="center"><img src="examples/nova_defense/docs/battle.png" width="200" alt="Nova Defense"><br>Nova Defense (ST)</td>
 <td align="center"><img src="examples/frank_the_frog/docs/playfield.png" width="200" alt="Frank the Frog"><br>Frank the Frog (ST)</td>
 <td align="center"><img src="examples/fractalus/docs/flight.png" width="200" alt="Fractalus"><br>Fractalus (Falcon030)</td>
+</tr><tr>
+<td align="center"><img src="examples/rock_blaster/docs/play.png" width="200" alt="Rock Blaster"><br>Rock Blaster (STE)</td>
+<td align="center"><img src="examples/orbital_patrol/docs/flight.png" width="200" alt="Orbital Patrol"><br>Orbital Patrol (STE)</td>
+<td align="center"><img src="examples/jump_quest/docs/level1.png" width="200" alt="Jump Quest"><br>Jump Quest (STE)</td>
 </tr></table>
 
 ## ROMs

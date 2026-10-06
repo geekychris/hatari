@@ -2,12 +2,16 @@
 # A port's Makefile sets NAME, SRCS (C and C++), optional EXTRA_CFLAGS,
 # then includes this file.  Reuses the ST port's IKBD input, NatFeats
 # and amiga_types.h (../st_port); falcon_port/ has the 16 bit true colour
-# graphics layer (fgfx), Paula emulation on DMA sound (fpaula) and its
+# graphics layer (fgfx), Paula emulation on DMA sound (../st_port/paula) and its
 # own Amiga header shims in compat/.
 #
 #   make CROSS=~/computers/atari-cc/opt/cross-mint/bin/m68k-atari-mintelf-
 #   make run         # Falcon in Hatari + agent API, build/ as C:, autostart
 
+# -fno-defer-pop: the ports run in supervisor mode between Super(0L) and
+# Super(old_ssp) in main(); EmuTOS's Super() restores the user stack
+# pointer saved by the first call, so the stack must be at the same depth
+# at both calls (GCC otherwise leaves earlier call arguments on it)
 CROSS   ?= m68k-atari-mintelf-
 CC       = $(CROSS)gcc
 CXX      = $(CROSS)g++
@@ -18,14 +22,14 @@ STPORT  := $(FPORT)../st_port/
 # most Falcons have none.  -msoft-float keeps any float code FPU free.
 CPU     ?= -m68030 -msoft-float
 LDCPU   ?= -m68000
-COMMON   = $(CPU) -O2 -fomit-frame-pointer -Wall -Wno-unused-function \
+COMMON   = $(CPU) -O2 -fomit-frame-pointer -fno-defer-pop -Wall -Wno-unused-function \
            -I. -I$(FPORT) -I$(FPORT)compat -I$(STPORT) $(EXTRA_CFLAGS)
 CFLAGS   = $(COMMON)
 CXXFLAGS = $(COMMON) -fno-exceptions -fno-rtti
 STRIP   ?=
 OUT      = build
 PRG      = $(OUT)/$(NAME).PRG
-F_SRCS   = $(FPORT)fgfx.c $(FPORT)fpaula.cpp $(FPORT)abstub.c $(STPORT)st_ikbd.c $(STPORT)natfeats.c
+F_SRCS   = $(FPORT)fgfx.c $(STPORT)paula.c $(FPORT)abstub.c $(STPORT)st_ikbd.c $(STPORT)natfeats.c
 ALL_SRCS = $(SRCS) $(F_SRCS)
 OBJS     = $(patsubst %,$(OUT)/obj/%.o,$(notdir $(basename $(ALL_SRCS))))
 HDRS     = $(wildcard *.h) $(wildcard $(FPORT)*.h) $(wildcard $(FPORT)compat/*.h) $(wildcard $(STPORT)*.h)

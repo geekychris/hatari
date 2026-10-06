@@ -28,6 +28,7 @@ struct RastPort {
 	UBYTE apen, bpen;
 	struct DirtyList *dirty;	/* NULL: don't record (background) */
 	UBYTE record;			/* HUD layer: record ops, see gfx_hud() */
+	UBYTE ormode;			/* lines OR their colour, see gfx_or_mode */
 };
 
 /* graphics.library subset (logical 320x256 coordinates) */
@@ -86,9 +87,31 @@ void gfx_or16_row(struct RastPort *rp, const WORD *xs, int n, WORD y,
  * dirty rectangles.  Cheaper than many small dirty rectangles.
  */
 void gfx_copy_band(WORD y0, WORD y1);
+
+/* Heightmap band (terrain): column x0+i gets top_col at logical row
+ * y[i] and body_col below it for body_h rows.  Much cheaper than a
+ * RectFill per height change. */
+void gfx_column_band(struct RastPort *rp, const WORD *y, int n, int x0,
+		     int top_col, int body_col, int body_h);
+
+/* Same for a scrolling world heightmap of n columns (wrapping): the
+ * physical rows are prepared once (redo when the terrain changes), each
+ * frame draws the 320 columns from world column 'start' (~5x faster). */
+typedef struct gfx_heightmap gfx_heightmap;
+gfx_heightmap *gfx_heightmap_prepare(const WORD *y, int n, int body_h);
+void gfx_heightmap_free(gfx_heightmap *h);
+void gfx_heightmap_draw(struct RastPort *rp, const gfx_heightmap *h, int start,
+			int top_col, int body_col);
+/* same, for rows just cleared to colour 0 (gfx_fill_rows) with nothing
+ * else drawn in them yet: plain writes, no read-modify-write */
+void gfx_heightmap_draw_fresh(struct RastPort *rp, const gfx_heightmap *h, int start,
+			      int top_col, int body_col);
+/* physical rows the terrain from 'start' covers (e.g. to clear them) */
+void gfx_heightmap_rows(const gfx_heightmap *h, int start, int *y0, int *y1);
 /* fill rows y0..y1 of the back buffer with a solid colour (movem
  * stores: about twice as fast as copying from the background) */
 void gfx_fill_band(WORD y0, WORD y1, int col);
+void gfx_fill_rows(int py0, int py1, int col);	/* same, physical rows */
 struct RastPort *gfx_back_nomark(void);
 
 /* Pre-shifted masked sprites (the classic ST technique): 'fn' draws the
@@ -105,6 +128,9 @@ gfx_sprite *gfx_sprite_build(gfx_draw_fn fn, const void *ctx, WORD arg, WORD y, 
  * appear on that colour and don't overlap (logs on water...). */
 gfx_sprite *gfx_sprite_build_on(gfx_draw_fn fn, const void *ctx, WORD arg, WORD y, WORD w, WORD h, int bg);
 void gfx_sprite_draw(struct RastPort *rp, const gfx_sprite *spr, WORD x);
+/* at logical x, y (top left of the build area) for objects that also
+ * move vertically; clipped; ORs into colour 0 areas in OR mode */
+void gfx_sprite_draw_xy(struct RastPort *rp, const gfx_sprite *spr, WORD x, WORD y);
 
 /* clear a RastPort's whole buffer to colour 0 (scenery layer use) */
 void gfx_clear(struct RastPort *rp);
@@ -128,6 +154,12 @@ void gfx_exit(void);
 struct RastPort *gfx_bg(void);		/* scenery layer */
 void gfx_bg_clear(void);
 void gfx_bg_to_screens(void);		/* after scenery changes */
+/* scenery rows y0..y1 (logical) into the background only, for ports
+ * that copy those rows into the back buffer every frame (gfx_copy_band) */
+void gfx_bg_commit_rows(WORD y0, WORD y1);
+/* after gfx_bg_commit_rows: have gfx_restore_back() copy those rows into
+ * each screen (instead of copying them every frame) */
+void gfx_bg_dirty_rows(WORD y0, WORD y1);
 struct RastPort *gfx_hud(void);		/* HUD layer (records operations) */
 void gfx_hud_commit(void);		/* render HUD changes of this frame */
 void gfx_hud_keep(void);		/* instead of drawing + commit: HUD unchanged */
@@ -135,6 +167,12 @@ void gfx_restore_back(void);		/* undo last sprites in back buffer */
 struct RastPort *gfx_back(void);	/* sprite layer: back buffer */
 void gfx_swap(void);			/* show back buffer from next VBL */
 void gfx_set_frame_vbls(int n);		/* frame pacing: VBLs per frame */
+
+/* Sprite layer lines in OR mode: Draw() only sets the planes where the
+ * pen has 1 bits instead of rewriting all four.  Correct over colour 0
+ * (vector graphics on a black background); where lines cross, colours
+ * mix.  Halves the cost of line-heavy frames. */
+void gfx_or_mode(int on);
 
 /* Small sprintf for the HUD (%s, %c, %ld/%d with optional zero padded
  * width): mintlib's stdio sprintf costs ~10000 cycles per call on a
