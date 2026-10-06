@@ -58,7 +58,9 @@ curl -s -XPOST localhost:7777/debug/break
 * [examples/interact](examples/interact): a GEM test target app, shell tests for every API feature,
   Python scenarios and the GUI
 * Amiga game ports from [geekychris/amiga_games](https://github.com/geekychris/amiga_games), made
-  and tuned with the agent API (profiler, breakpoints, `/mem`, scripted play):
+  and tuned with the agent API (profiler, breakpoints, `/mem`, scripted play). To pick one and
+  play it, run `python3 tools/games/launcher.py`: a game menu driven by
+  [examples/games.ini](examples/games.ini), see [tools/games](tools/games).
   * Atari ST ([examples/st_port](examples/st_port) layer):
     [uranus_lander](examples/uranus_lander) (with an autopilot),
     [nova_defense](examples/nova_defense) (with a bot),
