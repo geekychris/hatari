@@ -66,6 +66,13 @@ curl -s -XPOST localhost:7777/debug/break
   * Atari Falcon030 ([examples/falcon_port](examples/falcon_port) layer: true colour, Paula on
     DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test)
 
+<table><tr>
+<td align="center"><img src="examples/uranus_lander/docs/flight.png" width="200" alt="Uranus Lander"><br>Uranus Lander (ST)</td>
+<td align="center"><img src="examples/nova_defense/docs/battle.png" width="200" alt="Nova Defense"><br>Nova Defense (ST)</td>
+<td align="center"><img src="examples/frank_the_frog/docs/playfield.png" width="200" alt="Frank the Frog"><br>Frank the Frog (ST)</td>
+<td align="center"><img src="examples/fractalus/docs/flight.png" width="200" alt="Fractalus"><br>Fractalus (Falcon030)</td>
+</tr></table>
+
 ## ROMs
 
 Only the free [EmuTOS](https://emutos.sourceforge.io/) images are fetched.
