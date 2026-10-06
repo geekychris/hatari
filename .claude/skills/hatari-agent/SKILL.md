@@ -105,6 +105,11 @@ per test case: `/state/load`, input, `/emu/run?frames=N`, compare `/screen`,
 
 - `examples/interact/tests/lib.sh`: shell helpers (wait_for console regex, click by layout name, shots).
 - `tools/agent/hatari_agent.py`: Python client (`Hatari().click(x, y)` etc.).
+- `tools/agent/dma_sound_capture.py out.wav 5`: record STE/Falcon DMA sound to WAV (works with `--sound off`).
+- `examples/fractalus/rescue_test.py`: scenario test that teleports the player by writing game state
+  through `/mem` (addresses logged by the program), then follows a state machine with screenshots.
+- Performance work: `profile on`, run, break, `profile save f.txt`, then
+  `python3 tools/debugger/hatari_profile.py -st -i f.txt` (needs `symbols prg` first).
 - Self-describing app pattern: the program prints `LAYOUT`/`SYMBOL`/event lines via NatFeats
   (`examples/gemdemo/natfeats.c`), so tests don't guess coordinates from pixels.
 - C cross toolchain: `tools/agent/fetch-cross-mint.sh`, build with `m68k-atari-mintelf-gcc ... -lgem`.
@@ -113,6 +118,8 @@ per test case: `/state/load`, input, `/emu/run?frames=N`, compare `/screen`,
 
 - Never leave Hatari's own GUI (F12) open: requests wait until it closes.
 - Joystick: TOS boots with IKBD joystick reports off; programs send IKBD `0x14,0x08`.
+- If Hatari never answers after launch, check `sample <pid>`: on macOS it can hang in CoreAudio
+  while opening the sound device. Relaunch with `--sound off`.
   With the mouse on, joystick-1 fire arrives as the right mouse button.
 - `/emu/run` with large `frames` takes real time. Combine with fast forward.
 - If the API doesn't answer, check `/tmp/hatari-agent.log`. Another Hatari

@@ -57,6 +57,14 @@ curl -s -XPOST localhost:7777/debug/break
 * [examples/gemdemo](examples/gemdemo): a GEM VDI showcase written in C, cross-compiled with m68k-atari-mintelf GCC
 * [examples/interact](examples/interact): a GEM test target app, shell tests for every API feature,
   Python scenarios and the GUI
+* Amiga game ports from [geekychris/amiga_games](https://github.com/geekychris/amiga_games), made
+  and tuned with the agent API (profiler, breakpoints, `/mem`, scripted play):
+  * Atari ST ([examples/st_port](examples/st_port) layer):
+    [uranus_lander](examples/uranus_lander) (with an autopilot),
+    [nova_defense](examples/nova_defense) (with a bot),
+    [frank_the_frog](examples/frank_the_frog)
+  * Atari Falcon030 ([examples/falcon_port](examples/falcon_port) layer: true colour, Paula on
+    DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test)
 
 ## ROMs
 
