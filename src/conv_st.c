@@ -323,6 +323,37 @@ void ConvST_ChangeResolution(bool bForceChange)
 
 
 /**
+ * Get where the emulated display area (without borders) is in the
+ * host screen surface: top-left offset, emulated resolution and the
+ * zoom factors (host pixels per emulated pixel).
+ */
+void ConvST_GetDisplayArea(int *x, int *y, int *w, int *h, int *zx, int *zy)
+{
+	int sw, sh;
+
+	Screen_GetDimension(NULL, &sw, &sh, NULL);
+	*zx = nScreenZoomX;
+	*zy = nScreenZoomY;
+	if (ConvGen_UseGenConvScreen())
+	{
+		/* generic conversion has no side borders, and is zoomed
+		 * to fill the surface above the statusbar
+		 */
+		*x = *y = 0;
+		*w = sw / nScreenZoomX;
+		*h = (sh - Statusbar_GetHeight()) / nScreenZoomY;
+		return;
+	}
+	/* borders are in low-res pixels, zoomed like the screen height */
+	int nZoom = (STRes == ST_LOW_RES) ? nScreenZoomX : 2;
+	*x = nBorderPixelsLeft * nZoom;
+	*y = nBorderPixelsTop * nZoom;
+	*w = (STRes == ST_LOW_RES) ? 320 : 640;
+	*h = 200;
+}
+
+
+/**
  * Init buffers/tables needed for ST to PC screen conversion
  */
 void ConvST_Init(void)

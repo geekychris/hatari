@@ -96,6 +96,7 @@ void ConvST_UnInit(void);
 void ConvST_Reset(void);
 void ConvST_SetSTResolution(bool bForceChange);
 void ConvST_ChangeResolution(bool bForceChange);
+void ConvST_GetDisplayArea(int *x, int *y, int *w, int *h, int *zx, int *zy);
 void ConvST_SetFullUpdate(void);
 void ConvST_Refresh(bool force_flip);
 bool ConvST_DrawFrame(void);

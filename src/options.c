@@ -20,6 +20,7 @@ const char Options_fileid[] = "Hatari options.c";
 #include <assert.h>
 
 #include "main.h"
+#include "agentapi.h"
 #include "version.h"
 #include "options.h"
 #include "configuration.h"
@@ -227,6 +228,10 @@ typedef enum {
 	OPT_SAVECONFIG,
 	OPT_CONTROLSOCKET,
 	OPT_CMDFIFO,
+	OPT_AGENT_PORT,
+	OPT_AGENT_BIND,
+	OPT_AGENT_ROMDIR,
+	OPT_AGENT_DEBUGGER,
 	OPT_LOGFILE,
 	OPT_LOGLEVEL,
 	OPT_ALERTLEVEL,
@@ -553,6 +558,14 @@ static const opt_t HatariOptions[] = {
 	  "<file>", "Hatari connects to given socket for commands" },
 	{ OPT_CMDFIFO, NULL, "--cmd-fifo",
 	  "<file>", "Hatari creates & reads commands from given fifo" },
+	{ OPT_AGENT_PORT, NULL, "--agent-port",
+	  "<port>", "Serve HTTP/JSON agent control API on given TCP port" },
+	{ OPT_AGENT_BIND, NULL, "--agent-bind",
+	  "<addr>", "IPv4 address for agent API (default=127.0.0.1)" },
+	{ OPT_AGENT_ROMDIR, NULL, "--agent-rom-dir",
+	  "<dir>", "Directory of TOS images selectable through agent API" },
+	{ OPT_AGENT_DEBUGGER, NULL, "--agent-debugger",
+	  "<bool>", "Agent API (instead of console) handles debugger stops" },
 #endif
 	{ OPT_LOGFILE, NULL, "--log-file",
 	  "<file>", "Save log output to <file> (default=stderr)" },
@@ -2408,6 +2421,39 @@ bool Opt_ParseParameters(int argc, const char * const argv[], int *exitval)
 			if (errstr)
 			{
 				return Opt_ShowError(OPT_CMDFIFO, arg, errstr);
+			}
+			break;
+
+		case OPT_AGENT_PORT:
+			errstr = AgentApi_SetPort(arg);
+			if (errstr)
+			{
+				return Opt_ShowError(OPT_AGENT_PORT, arg, errstr);
+			}
+			break;
+
+		case OPT_AGENT_BIND:
+			errstr = AgentApi_SetBind(arg);
+			if (errstr)
+			{
+				return Opt_ShowError(OPT_AGENT_BIND, arg, errstr);
+			}
+			break;
+
+		case OPT_AGENT_ROMDIR:
+			errstr = AgentApi_SetRomDir(arg);
+			if (errstr)
+			{
+				return Opt_ShowError(OPT_AGENT_ROMDIR, arg, errstr);
+			}
+			break;
+
+		case OPT_AGENT_DEBUGGER:
+			{
+				bool own;
+				ok = Opt_Bool(arg, OPT_AGENT_DEBUGGER, &own);
+				if (ok)
+					AgentApi_SetOwnDebugger(own);
 			}
 			break;
 

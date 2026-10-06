@@ -44,3 +44,6 @@ Debug/*
 .cproject
 .project
 .settings/
+
+# agent API: local ROM collection (not redistributable in general)
+/roms/

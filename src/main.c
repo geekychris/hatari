@@ -11,6 +11,7 @@ const char Main_fileid[] = "Hatari main.c";
 #include <time.h>
 
 #include "main.h"
+#include "agentapi.h"
 #include "version.h"
 #include "configuration.h"
 #include "control.h"
@@ -336,11 +337,15 @@ void Main_Init(int argc, char *argv[])
 	
 	/* Check if Timing_Delay is accurate */
 	Timing_CheckForAccurateDelays();
+
+	/* Start agent API server if enabled */
+	AgentApi_Init();
 }
 
 
 void Main_UnInit(void)
 {
+	AgentApi_UnInit();
 	Control_RemoveFifo();
 
 	/* cleanly close the AVI file, if needed */

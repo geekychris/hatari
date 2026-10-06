@@ -1391,6 +1391,25 @@ static void BreakCond_List(bc_breakpoints_t *bps)
 
 
 /**
+ * Get information about CPU breakpoint at given (0-based) index,
+ * for the agent API.  Return false if there's no such breakpoint.
+ */
+bool BreakCond_GetCpuBreakPoint(int index, const char **expression,
+				int *hits, bool *once, bool *trace)
+{
+	bc_breakpoint_t *bp;
+
+	if (index < 0 || index >= CpuBreakPoints.count)
+		return false;
+	bp = CpuBreakPoints.breakpoint + index;
+	*expression = bp->expression;
+	*hits = bp->hits;
+	*once = bp->options.once;
+	*trace = bp->options.trace;
+	return true;
+}
+
+/**
  * Remove condition breakpoint at given position
  */
 static bool BreakCond_Remove(bc_breakpoints_t *bps, int position)

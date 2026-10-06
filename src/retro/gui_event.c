@@ -106,6 +106,10 @@ static void GuiEvent_HandleMouseButton(void)
  * Here we process the events (keyboard, mouse, ...) and map it to
  * Atari IKBD events.
  */
+void GuiEvent_WakeUp(void)
+{
+}
+
 void GuiEvent_EventHandler(void)
 {
 	GuiEvent_HandleMouseMotion();

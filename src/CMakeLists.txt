@@ -4,6 +4,8 @@
 # - unzip.c: added separately if ZLIB_FOUND
 set(SOURCES
 	acia.c
+	agentapi.c
+	agenthttp.c
 	avi_record.c
 	bios.c
 	blitter.c

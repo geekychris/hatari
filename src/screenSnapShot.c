@@ -106,6 +106,34 @@ static int ScreenSnapShot_SavePNG(const char *filename)
 
 
 /**
+ * Save the emulated display area (no borders / statusbar) at native
+ * emulated resolution (e.g. 320x200 for ST low res), so that image
+ * pixel coordinates match emulated (GEM) screen coordinates.
+ * Return >0 for success, -1 for error.
+ */
+int ScreenSnapShot_SavePNG_Native(const char *filename)
+{
+	FILE *fp;
+	int ret, x, y, w, h, zx, zy, sw, sh, pitch;
+	uint32_t *pixels;
+
+	ConvST_GetDisplayArea(&x, &y, &w, &h, &zx, &zy);
+	Screen_GetDimension(&pixels, &sw, &sh, &pitch);
+	if (!pixels || w <= 0 || h <= 0 || x + w*zx > sw || y + h*zy > sh)
+		return -1;
+
+	fp = fopen(filename, "wb");
+	if (!fp)
+		return -1;
+	ret = ScreenSnapShot_SavePNG_ToFile(pixels, pitch, sw, sh, w, h,
+	                                    fp, -1, -1, x, sw - x - w*zx,
+	                                    y, sh - y - h*zy);
+	fclose(fp);
+	return ret;
+}
+
+
+/**
  * Save given frame as PNG in an already opened FILE, eventually cropping some borders.
  * Return png file size > 0 for success.
  * This function is also used by avi_record.c to save individual frames as png images.
@@ -142,7 +170,7 @@ int ScreenSnapShot_SavePNG_ToFile(uint32_t *pixels, int pitch, int src_w, int sr
 	{
 		src_ptr = pixels + (CropTop + (y * sh + dh/2) / dh) * (pitch / 4)
 		          + CropLeft;
-		if (!PixelConvert_32to8Bits(rowbuf, src_ptr, dw, src_w))
+		if (!PixelConvert_32to8Bits(rowbuf, src_ptr, dw, sw))
 			do_palette = false;
 	}
 	Screen_UnLock();
@@ -223,13 +251,13 @@ int ScreenSnapShot_SavePNG_ToFile(uint32_t *pixels, int pitch, int src_w, int sr
 		if (!do_palette)
 		{
 			/* unpack 32-bit RGBA pixels */
-			PixelConvert_32to24Bits(rowbuf, src_ptr, dw, src_w);
+			PixelConvert_32to24Bits(rowbuf, src_ptr, dw, sw);
 		}
 		else
 		{
 			/* Reindex back to ST palette
 			 * Note that this cannot disambiguate indices if the palette has duplicate colors */
-			PixelConvert_32to8Bits(rowbuf, src_ptr, dw, src_w);
+			PixelConvert_32to8Bits(rowbuf, src_ptr, dw, sw);
 		}
 		/* and unlock surface before syscalls */
 		Screen_UnLock();

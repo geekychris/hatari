@@ -20,6 +20,7 @@ const char Console_fileid[] = "Hatari console.c";
 #include "console.h"
 #include "options.h"
 #include "str.h"
+#include "agentapi.h"
 
 /* number of xconout devices to track */
 int ConOutDevices;
@@ -68,6 +69,7 @@ void Console_SetTrace(bool enable)
  */
 static void map_character(uint8_t value)
 {
+	AgentApi_ConsoleWrite((const char *)&value, 1);
 	switch(value) {
 	case '\b':
 	case '\t':

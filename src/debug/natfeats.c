@@ -23,6 +23,7 @@ const char Natfeats_fileid[] = "Hatari natfeats.c";
 #include "statusbar.h"
 #include "nf_scsidrv.h"
 #include "log.h"
+#include "agentapi.h"
 
 /* maximum input string length */
 #define NF_MAX_STRING 4096
@@ -162,6 +163,7 @@ static bool nf_stderr(uint32_t stack, uint32_t subid, uint32_t *retval)
 		return false;
 	}
 	str = (const char *)STMemory_STAddrToPointer (ptr);
+	AgentApi_ConsoleWrite(str, strlen(str));
 	*retval = fprintf(stderr, "%s", str);
 	fflush(stderr);
 	return true;
