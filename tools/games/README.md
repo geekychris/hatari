@@ -1,6 +1,6 @@
 # Game launcher
 
-A menu for the Amiga game ports in `examples/`. Pick a game and it starts in Hatari on the right machine.
+A menu for the Amiga game ports in `examples/`. Pick a game and it starts in Hatari on the right machine. For a menu that runs on the Atari itself, with all the games on one C: drive, see [examples/st_launcher](../../examples/st_launcher), which reads the same `games.ini`.
 
 ```sh
 python3 tools/games/launcher.py              # window: list, screenshot, controls, Play

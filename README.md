@@ -60,7 +60,9 @@ curl -s -XPOST localhost:7777/debug/break
 * Amiga game ports from [geekychris/amiga_games](https://github.com/geekychris/amiga_games), made
   and tuned with the agent API (profiler, breakpoints, `/mem`, scripted play). To pick one and
   play it, run `python3 tools/games/launcher.py`: a game menu driven by
-  [examples/games.ini](examples/games.ini), see [tools/games](tools/games).
+  [examples/games.ini](examples/games.ini), see [tools/games](tools/games). Or put them all on
+  one Atari C: drive with a menu that runs on the ST itself:
+  [examples/st_launcher](examples/st_launcher) (`make play`).
   * Atari ST ([examples/st_port](examples/st_port) layer):
     [uranus_lander](examples/uranus_lander) (with an autopilot),
     [nova_defense](examples/nova_defense) (with a bot),
