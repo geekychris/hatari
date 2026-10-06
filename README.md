@@ -50,6 +50,13 @@ curl -s -XPOST localhost:7777/debug/break
 * GDB: [doc/agent-gdb.md](doc/agent-gdb.md) (`gdb -x tools/agent/hatari.gdb`)
 * Design and changes to Hatari: [doc/agent-design.md](doc/agent-design.md)
 * Claude Code skill: [.claude/skills/hatari-agent/SKILL.md](.claude/skills/hatari-agent/SKILL.md)
+* Python client and GUI: `tools/agent/hatari_agent.py`, `python3 tools/agent/hatari_gui.py`
+
+## Examples
+
+* [examples/gemdemo](examples/gemdemo): a GEM VDI showcase written in C, cross-compiled with m68k-atari-mintelf GCC
+* [examples/interact](examples/interact): a GEM test target app, shell tests for every API feature,
+  Python scenarios and the GUI
 
 ## ROMs
 
