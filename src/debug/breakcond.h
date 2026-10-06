@@ -18,6 +18,8 @@ extern const char BreakAddr_Description[];
 extern bool BreakCond_MatchCpu(void);
 extern bool BreakCond_MatchDsp(void);
 extern int BreakCond_CpuBreakPointCount(void);
+extern bool BreakCond_GetCpuBreakPoint(int index, const char **expression,
+				       int *hits, bool *once, bool *trace);
 extern int BreakCond_DspBreakPointCount(void);
 extern bool BreakCond_Command(const char *expression, bool bForDsp);
 extern bool BreakAddr_Command(char *expression, bool bforDsp);

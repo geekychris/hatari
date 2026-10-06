@@ -14,6 +14,7 @@ const char Joy_fileid[] = "Hatari joy.c";
 #include "configuration.h"
 #include "ioMem.h"
 #include "joy.h"
+#include "agentapi.h"
 #include "joy_ui.h"
 #include "keymap.h"
 #include "log.h"
@@ -131,6 +132,9 @@ uint8_t Joy_GetStickData(int nStJoyId)
 				nData &= ~ATARIJOY_BITMASK_FIRE;          /* Remove top bit! */
 		}
 	}
+
+	/* remote agent API joystick input */
+	nData |= AgentApi_JoystickBits(nStJoyId);
 
 	/* Ignore fire button every 8 frames if enabled autofire (for both cursor emulation and joystick) */
 	if (ConfigureParams.Joysticks.Joy[nStJoyId].bEnableAutoFire)

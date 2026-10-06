@@ -1421,6 +1421,16 @@ void DebugCpu_Check(void)
 }
 
 /**
+ * Request CPU to stop into the debugger after the next instruction
+ * (used by the agent API to break into a running program).
+ */
+void DebugCpu_RequestBreak(void)
+{
+	nCpuSteps = 1;
+	M68000_SetDebugger(true);
+}
+
+/**
  * Should be called before returning back emulation to tell the CPU core
  * to call us after each instruction if "real-time" debugging like
  * breakpoints has been set.

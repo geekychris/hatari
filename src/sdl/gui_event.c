@@ -14,6 +14,7 @@
 #include <SDL.h>
 #endif
 
+#include "agentapi.h"
 #include "configuration.h"
 #include "control.h"
 #include "conv_st.h"
@@ -117,6 +118,23 @@ static void GuiEvent_HandleMouseMotion(int dx, int dy)
  * Here we process the SDL events (keyboard, mouse, ...) and map it to
  * Atari IKBD events.
  */
+/**
+ * Wake up main thread from SDL_WaitEvent() while emulation is paused.
+ * Can be called from any thread.
+ */
+void GuiEvent_WakeUp(void)
+{
+	SDL_Event event;
+
+	memset(&event, 0, sizeof(event));
+#if ENABLE_SDL3
+	event.type = SDL_EVENT_USER;
+#else
+	event.type = SDL_USEREVENT;
+#endif
+	SDL_PushEvent(&event);
+}
+
 void GuiEvent_EventHandler(void)
 {
 	bool bContinueProcessing;
@@ -132,6 +150,7 @@ void GuiEvent_EventHandler(void)
 
 		/* check remote process control */
 		remotepause = Control_CheckUpdates();
+		AgentApi_Poll();
 
 		if ( bEmulationActive || remotepause )
 		{
@@ -143,7 +162,11 @@ void GuiEvent_EventHandler(void)
 			/* last (shortcut) event activated emulation? */
 			if ( bEmulationActive )
 				break;
-			events = SDL_WaitEvent(&event);
+			/* with agent API, wake up regularly for its job timeouts */
+			if (AgentApi_IsEnabled())
+				events = SDL_WaitEventTimeout(&event, 100);
+			else
+				events = SDL_WaitEvent(&event);
 		}
 		if (!events)
 		{

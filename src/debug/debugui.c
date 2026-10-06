@@ -42,6 +42,7 @@ const char DebugUI_fileid[] = "Hatari debugui.c";
 #include "68kDisass.h"
 #include "debugInfo.h"
 #include "debugui.h"
+#include "agentapi.h"
 #include "evaluate.h"
 #include "history.h"
 #include "profile.h"
@@ -1355,7 +1356,12 @@ void DebugUI(debug_reason_t reason)
 	alertLevel = Log_SetAlertLevel(LOG_FATAL);
 
 	cmdret = DEBUGGER_CMDDONE;
-	do
+	if (AgentApi_OwnsDebugger())
+	{
+		/* remote agent API takes debugger commands instead of console */
+		AgentApi_DebugStop(reason);
+	}
+	else do
 	{
 		/* Read command from the keyboard and give previous
 		 * command for freeing / adding to history
@@ -1547,6 +1553,36 @@ bool DebugUI_ParseLine(const char *input)
 		DebugDsp_SetDebugging();
 	}
 	return (ret == DEBUGGER_CMDDONE);
+}
+
+/**
+ * Remote (agent API) debugger command execution.  Unlike
+ * DebugUI_ParseLine(), returns the DEBUGGER_* code so that caller
+ * knows whether command wants to leave the debugger, and doesn't
+ * repeat previous command for empty input.
+ */
+int DebugUI_RemoteCommand(const char *input)
+{
+	char *expanded;
+	int ret;
+
+	if (!input)
+		return DEBUGGER_CMDDONE;
+	while (isspace((unsigned char)*input))
+		input++;
+	if (!*input)
+		return DEBUGGER_CMDDONE;
+	DebugUI_Init();
+
+	expanded = DebugUI_EvaluateExpressions(input);
+	if (!expanded)
+		return DEBUGGER_CMDDONE;
+	ret = DebugUI_ParseCommand(expanded);
+	free(expanded);
+
+	DebugCpu_SetDebugging();
+	DebugDsp_SetDebugging();
+	return ret;
 }
 
 /**
