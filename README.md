@@ -71,10 +71,14 @@ curl -s -XPOST localhost:7777/debug/break
     [rock_blaster](examples/rock_blaster), [orbital_patrol](examples/orbital_patrol) (MOD music),
     [jump_quest](examples/jump_quest), [stakattack](examples/stakattack) (MOD music),
     [dot_chase](examples/dot_chase), [lunar_rider](examples/lunar_rider) and
-    [pea_shooter_blast](examples/pea_shooter_blast) (both scrolled with the STE blitter)
+    [pea_shooter_blast](examples/pea_shooter_blast) (both scrolled with the STE blitter),
+    [sky_knights](examples/sky_knights), [orb_hunter](examples/orb_hunter),
+    [bullion_dash](examples/bullion_dash) (with its level editor),
+    [rj_birthday](examples/rj_birthday) (blitter-scrolled house)
   * Atari Falcon030 ([examples/falcon_port](examples/falcon_port) layer: true colour, Paula on
     DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test),
-    [void_trader](examples/void_trader) (filled 3D, trading)
+    [void_trader](examples/void_trader) (filled 3D, trading), [ace_pilot](examples/ace_pilot)
+    (wireframe dogfights, split screen)
 
 <table><tr>
 <td align="center"><img src="examples/uranus_lander/docs/flight.png" width="200" alt="Uranus Lander"><br>Uranus Lander (ST)</td>
@@ -91,6 +95,13 @@ curl -s -XPOST localhost:7777/debug/break
 <td align="center"><img src="examples/lunar_rider/docs/ride.png" width="200" alt="Lunar Rider"><br>Lunar Rider (STE)</td>
 <td align="center"><img src="examples/pea_shooter_blast/docs/enemies.png" width="200" alt="Pea Shooter Blast"><br>Pea Shooter Blast (STE)</td>
 <td align="center"><img src="examples/void_trader/docs/combat.png" width="200" alt="Void Trader"><br>Void Trader (Falcon030)</td>
+</tr><tr>
+<td align="center"><img src="examples/sky_knights/docs/play.png" width="200" alt="Sky Knights"><br>Sky Knights (STE)</td>
+<td align="center"><img src="examples/orb_hunter/docs/citadel.png" width="200" alt="Orb Hunter"><br>Orb Hunter (STE)</td>
+<td align="center"><img src="examples/bullion_dash/docs/level1.png" width="200" alt="Bullion Dash"><br>Bullion Dash (STE)</td>
+<td align="center"><img src="examples/rj_birthday/docs/scrolling.png" width="200" alt="RJ's Birthday Bash"><br>RJ's Birthday Bash (STE)</td>
+</tr><tr>
+<td align="center"><img src="examples/ace_pilot/docs/colour.png" width="200" alt="Ace Pilot"><br>Ace Pilot (Falcon030)</td>
 </tr></table>
 
 ## ROMs
