@@ -8,6 +8,7 @@
 
 volatile UBYTE ikbd_keys[128];
 static volatile UBYTE key_hits[128];
+static volatile UBYTE last_hit;
 static volatile UBYTE joy0, joy1, joy1_hits, mouse_buttons;
 static volatile WORD mouse_dx, mouse_dy;
 static void *old_vec;
@@ -50,7 +51,10 @@ void ikbd_byte(UBYTE b)
 	}
 	ikbd_keys[b & 0x7f] = !(b & 0x80);
 	if (!(b & 0x80))
+	{
 		key_hits[b] = 1;
+		last_hit = b;
+	}
 }
 
 /* keyboard ACIA interrupt (drains MIDI ACIA too, software EOI) */
@@ -120,6 +124,13 @@ UBYTE ikbd_joy1(void)
 {
 	/* fire as right mouse button when the mouse is on, see header */
 	return joy1 | ((mouse_buttons & 2) ? 0x80 : 0);
+}
+
+int ikbd_last_hit(void)
+{
+	int sc = last_hit;
+	last_hit = 0;
+	return sc;
 }
 
 int ikbd_key_hit(int sc)
