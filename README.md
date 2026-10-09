@@ -79,6 +79,10 @@ curl -s -XPOST localhost:7777/debug/break
     DMA sound): [fractalus](examples/fractalus) (voxel terrain, with a rescue scenario test),
     [void_trader](examples/void_trader) (filled 3D, trading), [ace_pilot](examples/ace_pilot)
     (wireframe dogfights, split screen)
+  * Atari Falcon030, the 3DO-derived games ([examples/falcon_3do](examples/falcon_3do) layer):
+    [spectral_keep](examples/spectral_keep) (isometric adventure); on an accelerated (CT60)
+    Falcon: [rolling_steel](examples/rolling_steel) (marble racer) and
+    [planet_chomp](examples/planet_chomp) (Pac-Man on a sphere)
 
 <table><tr>
 <td align="center"><img src="examples/uranus_lander/docs/flight.png" width="200" alt="Uranus Lander"><br>Uranus Lander (ST)</td>
@@ -102,6 +106,9 @@ curl -s -XPOST localhost:7777/debug/break
 <td align="center"><img src="examples/rj_birthday/docs/scrolling.png" width="200" alt="RJ's Birthday Bash"><br>RJ's Birthday Bash (STE)</td>
 </tr><tr>
 <td align="center"><img src="examples/ace_pilot/docs/colour.png" width="200" alt="Ace Pilot"><br>Ace Pilot (Falcon030)</td>
+<td align="center"><img src="examples/spectral_keep/docs/play.png" width="200" alt="Spectral Keep"><br>Spectral Keep (Falcon030)</td>
+<td align="center"><img src="examples/rolling_steel/docs/play.png" width="200" alt="Rolling Steel"><br>Rolling Steel (Falcon, 68060)</td>
+<td align="center"><img src="examples/planet_chomp/docs/play.png" width="200" alt="Planet Chomp"><br>Planet Chomp (Falcon, 68060)</td>
 </tr></table>
 
 ## ROMs
