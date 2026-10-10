@@ -1,6 +1,12 @@
 # Game launcher
 
-A menu for the Amiga game ports in `examples/`. Pick a game and it starts in Hatari on the right machine. For a menu that runs on the Atari itself, with all the games on one C: drive, see [examples/st_launcher](../../examples/st_launcher), which reads the same `games.ini`.
+A menu for the Atari ports of the Amiga games, which live in their own repo, [geekychris/atari_st_games](https://github.com/geekychris/atari_st_games). Pick a game and it starts in Hatari on the right machine. For a menu that runs on the Atari itself, with all the games on one C: drive, see that repo's `st_launcher`, which reads the same `games.ini`.
+
+Check the games out next to this repo (or set `ATARI_GAMES_DIR`, or pass `--ini`):
+
+```sh
+git clone https://github.com/geekychris/atari_st_games ../atari_st_games
+```
 
 ```sh
 python3 tools/games/launcher.py              # window: list, screenshot, controls, Play
@@ -8,7 +14,7 @@ python3 tools/games/launcher.py --list       # the game ids
 python3 tools/games/launcher.py --play lunar_rider [--no-build] [--no-sound]
 ```
 
-The games are defined in [`examples/games.ini`](../../examples/games.ini), one section per game:
+The games are defined in that repo's [`games.ini`](https://github.com/geekychris/atari_st_games/blob/main/games.ini), one section per game:
 
 ```ini
 [void_trader]
