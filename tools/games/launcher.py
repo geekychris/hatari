@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Game launcher for the Amiga game ports in examples/.
+"""Game launcher for the Atari ports of the Amiga games
+(geekychris/atari_st_games, checked out next to this repo).
 
     python3 tools/games/launcher.py              # pick a game in a window
     python3 tools/games/launcher.py --list       # list the games
     python3 tools/games/launcher.py --play void_trader
 
-The games are defined in examples/games.ini (or --ini FILE): directory,
+The games are defined in atari_st_games/games.ini (or --ini FILE; or
+$ATARI_GAMES_DIR/games.ini): directory,
 program, machine (ST, STE, Falcon...), TOS, Hatari options, screenshot,
 description and controls.  Playing a game builds it if needed (make in
 its directory), stops a Hatari already answering on the agent API port,
@@ -27,7 +29,11 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-DEFAULT_INI = os.path.join(REPO, "examples", "games.ini")
+# the games live in their own repo, geekychris/atari_st_games: by default
+# a checkout next to this one
+GAMES_DIR = os.path.abspath(os.environ.get("ATARI_GAMES_DIR")
+                            or os.path.join(REPO, "..", "atari_st_games"))
+DEFAULT_INI = os.path.join(GAMES_DIR, "games.ini")
 RUN_SCRIPT = os.path.join(REPO, "tools", "agent", "hatari-agent-run.sh")
 AGENT_GUI = os.path.join(REPO, "tools", "agent", "hatari_gui.py")
 
@@ -299,6 +305,12 @@ def main():
     args = ap.parse_args()
 
     launcher_ini = args.ini
+    if not os.path.exists(args.ini):
+        sys.exit("no games file at %s\n"
+                 "The games are in their own repo; check it out next to this one:\n"
+                 "  git clone https://github.com/geekychris/atari_st_games %s\n"
+                 "or set ATARI_GAMES_DIR, or pass --ini FILE."
+                 % (args.ini, os.path.join(os.path.dirname(REPO), "atari_st_games")))
     launcher = Launcher(args.ini)
     if args.no_sound:
         launcher.sound = False

@@ -106,8 +106,9 @@ per test case: `/state/load`, input, `/emu/run?frames=N`, compare `/screen`,
 - `examples/interact/tests/lib.sh`: shell helpers (wait_for console regex, click by layout name, shots).
 - `tools/agent/hatari_agent.py`: Python client (`Hatari().click(x, y)` etc.).
 - `tools/agent/dma_sound_capture.py out.wav 5`: record STE/Falcon DMA sound to WAV (works with `--sound off`).
-- `examples/fractalus/rescue_test.py`: scenario test that teleports the player by writing game state
-  through `/mem` (addresses logged by the program), then follows a state machine with screenshots.
+- `fractalus/rescue_test.py` in [atari_st_games](https://github.com/geekychris/atari_st_games) (the
+  game ports' own repo): scenario test that teleports the player by writing game state through
+  `/mem` (addresses logged by the program), then follows a state machine with screenshots.
 - Performance work: `profile on`, run, break, `profile save f.txt`, then
   `python3 tools/debugger/hatari_profile.py -st -i f.txt` (needs `symbols prg` first).
 - Self-describing app pattern: the program prints `LAYOUT`/`SYMBOL`/event lines via NatFeats
